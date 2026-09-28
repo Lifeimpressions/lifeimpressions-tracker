@@ -215,7 +215,7 @@ var TITLES={today:'Today',jobs:'Job board',enq:'Enquiries',sched:'Schedule',repo
 /* ------------------------------------------------------------------ state */
 var CFG=window.APP_CONFIG||{};
 var sb=null;
-var S={me:null,ref:{},staff:[],jobs:[],enq:[],workload:[],inbox:[],files:{},urls:{},msgs:{},view:'today',locFilter:'all',modal:null,toast:null,busy:false,focusModal:false};
+var S={me:null,ref:{},staff:[],jobs:[],cancelled:[],enq:[],workload:[],inbox:[],files:{},urls:{},msgs:{},view:'today',locFilter:'all',modal:null,toast:null,busy:false,focusModal:false};
 
 /* ------------------------------------------------------------------ helpers */
 function $(id){return document.getElementById(id);}
@@ -316,7 +316,11 @@ async function loadAll(silent){
     var cust=idx(r[6]),ord=idx(r[7]),svc=idx(r[1]),fr=idx(r[2]),loc=idx(r[0]),stf=idx(r[5]),ad=idx(r[3]),vs=idx(r[10]);
     var byOrder={};r[8].forEach(function(x){(byOrder[x.order_id]=byOrder[x.order_id]||[]).push((ad[x.addon_id]||{}).name);});
     var stg=idx(r[4],'stage');
-    S.jobs=r[9].map(function(j){
+    S.cancelled=r[9].filter(function(j){return j.cancelled_at;}).map(function(j){
+      var o=ord[j.order_id]||{},c=cust[o.customer_id]||{},sv=svc[o.service_id]||{};
+      return Object.assign({},j,{customer:c.name||'Unknown',service:sv.name||'',loc:(loc[j.location_id]||{}).name||''});
+    });
+    S.jobs=r[9].filter(function(j){return !j.cancelled_at;}).map(function(j){
       var o=ord[j.order_id]||{},c=cust[o.customer_id]||{},v=vs[j.id]||{},s=svc[o.service_id]||{};
       return Object.assign({},j,{
         customer:c.name||'Unknown',phone:c.whatsapp||'',service:s.name||'',hours:s.duration_hours,
@@ -552,7 +556,12 @@ function vReports(){
   h+='</div></div><div class="panel"><h2>Workload by person</h2><div class="tablewrap"><table><thead><tr><th>Person</th><th>Active</th><th>Overdue</th><th>Waiting</th></tr></thead><tbody>';
   var l=scopeLoc();
   S.workload.filter(function(w){return !l||w.location_id===l;}).forEach(function(w){h+='<tr><td>'+esc(w.name)+'</td><td>'+w.active_jobs+'</td><td>'+w.overdue_jobs+'</td><td>'+w.waiting_jobs+'</td></tr>';});
-  return h+'</tbody></table></div></div></div></div>';
+  h+='</tbody></table></div></div>';
+  var cl=S.cancelled.filter(function(j){return !l||j.location_id===l;});
+  h+='<div class="panel"><h2>Cancelled bookings</h2>';
+  if(!cl.length)h+='<div class="empty">No cancelled bookings.</div>';
+  else{h+='<div class="list">'+cl.map(function(j){return '<div class="item"><div class="t"><b>'+esc(j.customer)+'</b><span class="muted small">'+esc(j.job_no)+' \u00B7 '+esc(shortSvc(j.service))+' \u00B7 '+esc(j.loc)+' \u00B7 '+esc(fmtShort(String(j.cancelled_at).slice(0,10)))+'</span><span class="small" style="display:block">'+esc(j.cancel_reason||'')+'</span></div>'+(isAdmin()?'<button class="btn sm ghost" data-a="restore-booking" data-id="'+j.id+'">Restore</button>':'')+'</div>';}).join('')+'</div>';}
+  return h+'</div></div></div>';
 }
 function vSettings(){
   var R=S.ref;
@@ -602,7 +611,8 @@ function vJob(j){
     '<div><dt>Balance due</dt><dd>'+inr(Math.max(0,j.total-j.advance))+'</dd></div>'+
     '<div><dt>Advance paid (\u20B9)</dt><dd class="row"><label class="sr" for="adv">Advance paid</label><input type="number" id="adv" min="0" value="'+esc(j.advance)+'" style="min-height:36px;width:110px"><button class="btn sm ghost" data-a="save-advance" data-id="'+j.id+'">Save</button></dd></div>'+
     '<div><dt>WhatsApp</dt><dd>'+esc(j.phone)+'</dd></div>'+
-    '<div><dt>GST invoice no.</dt><dd class="row"><label class="sr" for="inv">GST invoice number</label><input type="text" id="inv" value="'+esc(j.invoice_no||'')+'" style="min-height:36px;width:130px"><button class="btn sm ghost" data-a="save-invoice" data-id="'+j.id+'">Save</button></dd></div></dl></div>';
+    '<div><dt>GST invoice no.</dt><dd class="row"><label class="sr" for="inv">GST invoice number</label><input type="text" id="inv" value="'+esc(j.invoice_no||'')+'" style="min-height:36px;width:130px"><button class="btn sm ghost" data-a="save-invoice" data-id="'+j.id+'">Save</button></dd></div></dl>'+
+    (j.stage!=='delivered'?'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><button class="btn sm ghost" data-a="cancel-booking" data-id="'+j.id+'" style="color:var(--rose)">Cancel booking</button></div>':'')+'</div>';
   h+='</div><div>'+phone(j)+'</div></div>';
   return h;
 }
@@ -689,6 +699,13 @@ function vEnqForm(){
    '<label class="f">Follow up on<input type="date" id="e-fu" value="'+addISO(todayISO(),1)+'"></label></div>'+
    '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn gold" data-a="save-enq">Add enquiry</button></div>';
 }
+var CANCEL_REASONS=['Customer cancelled','Customer moved to another date or studio','No response from customer','Duplicate booking','Entered by mistake','Other'];
+function vCancel(j){
+  return '<h2 id="dlgt">Cancel '+esc(j.job_no)+' for '+esc(j.customer)+'?</h2><p class="muted small" style="margin:4px 0 16px">The job leaves the board and reports. The record is kept, and head office can restore it. The customer is not told automatically, and a Wix booking is not cancelled on the website.</p>'+
+   '<label class="f">Reason<select id="c-reason">'+opt(CANCEL_REASONS,'Customer cancelled')+'</select></label>'+
+   '<label class="f" style="margin-top:12px">Note (optional)<input type="text" id="c-note" autocomplete="off"></label>'+
+   '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Keep the booking</button><button class="btn" data-a="confirm-cancel" data-id="'+j.id+'" style="background:var(--rose);border-color:var(--rose);color:#fff">Cancel booking</button></div>';
+}
 function vLost(x){
   return '<h2 id="dlgt">Why was '+esc(x.name)+' lost?</h2><p class="muted small" style="margin:4px 0 16px">A reason helps you see patterns in the report.</p><label class="f">Reason<select id="l-reason">'+opt(LOST_REASONS,'Price')+'</select></label>'+
    '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn" data-a="save-lost" data-id="'+x.id+'">Mark as lost</button></div>';
@@ -712,7 +729,7 @@ function render(){
   if(S.modal){
     var m=S.modal;
     if(m.type==='job'){var j=jobById(m.id);if(j)h+='<div class="overlay" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Job '+esc(j.job_no)+'" tabindex="-1" id="modal">'+vJob(j)+'</div></div>';}
-    else{var body=m.type==='booking'?vBooking(m.pre):(m.type==='enq'?vEnqForm():vLost(enqById(m.id)));h+='<div class="overlay center" data-a="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgt" tabindex="-1" id="modal">'+body+'</div></div>';}
+    else{var body=m.type==='booking'?vBooking(m.pre):(m.type==='enq'?vEnqForm():(m.type==='cancel'?vCancel(jobById(m.id)):vLost(enqById(m.id))));h+='<div class="overlay center" data-a="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgt" tabindex="-1" id="modal">'+body+'</div></div>';}
   }
   var me=$('msgs'),keep=me?me.scrollTop:0,atEnd=me?(me.scrollHeight-me.scrollTop-me.clientHeight<40):true;
   var sheet=document.querySelector('.sheet'),sk=sheet?sheet.scrollTop:0;
@@ -759,6 +776,16 @@ document.addEventListener('click',async function(ev){
       var ra=await sb.from('orders').update({advance_paid:v}).eq('id',jb.order_id);
       if(ra.error)throw ra.error;await refreshAfter('Advance saved.');break;}
     case 'new-enq':openModal({type:'enq'});break;
+    case 'cancel-booking':openModal({type:'cancel',id:id});break;
+    case 'confirm-cancel':{
+      var note=$('c-note').value.trim(),why=$('c-reason').value+(note?' - '+note:'');
+      var rc=await sb.from('jobs').update({cancelled_at:new Date().toISOString(),cancel_reason:why}).eq('id',id);
+      if(rc.error)throw rc.error;
+      S.modal=null;await refreshAfter('Booking cancelled. It is kept under Reports.');break;}
+    case 'restore-booking':{
+      var rs=await sb.from('jobs').update({cancelled_at:null}).eq('id',id);
+      if(rs.error)throw rs.error;
+      await refreshAfter('Booking restored to the board.');break;}
     case 'adv':await advance(jobById(id));break;
     case 'approve-qc':
       await upd(id,{qc_approved:true});await refreshAfter('Quality check approved.');break;
