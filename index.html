@@ -5,26 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1B2430">
 <title>Lifeimpressions Studio Tracker</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Studio Tracker">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ground:#EDEEEC; --surface:#F8F8F6; --sunk:#E2E5E3; --ink:#1B2430; --ink2:#4A5564; --line:#CFD3D1;
-  --gold:#D4A03C; --onGold:#1B2430;
-  --bronze:#7E5210; --bronzeBg:#F1E4C2;
-  --rose:#9C3B46; --roseBg:#F2DADD;
-  --teal:#25655F; --tealBg:#D3E8E5;
-  --focus:#2F6FEB; --scrim:rgba(14,19,26,.55);
-  --bubbleIn:#FFFFFF; --bubbleOut:#D9EFE6; --chat:#E4E2DA;
+  /* Dark navy sidebar + light content, one bright blue accent (sampled from brand reference) */
+  --ground:#F3F5FA; --surface:#FFFFFF; --sunk:#EEF1F6; --ink:#161A2E; --ink2:#6B7280; --line:#E2E6EF;
+  --accent:#2F6FEB; --onAccent:#FFFFFF; --accentBg:#E9F1FF;
+  --gold:var(--accent); --onGold:var(--onAccent);
+  --bronze:#8A6A1F; --bronzeBg:#F3EDDD;
+  --rose:#C23D4B; --roseBg:#FAE3E6;
+  --teal:#1FA568; --tealBg:#E1F5EA;
+  --focus:#2F6FEB; --scrim:rgba(13,15,30,.55);
+  --bubbleIn:#FFFFFF; --bubbleOut:var(--accentBg); --chat:#EEF1F6;
+  --sidebar-bg:#0F102E; --sidebar-ink:#ECEEF8; --sidebar-ink2:#9195B8; --sidebar-line:rgba(255,255,255,.09); --sidebar-active:var(--accent);
   --display:'Bricolage Grotesque','Segoe UI',system-ui,-apple-system,'Noto Sans Tamil',sans-serif;
   --body:'Instrument Sans','Segoe UI',system-ui,-apple-system,'Noto Sans Tamil',sans-serif;
 }
 @media (prefers-color-scheme:dark){
   :root{
-    --ground:#12171E; --surface:#1A212A; --sunk:#232B36; --ink:#E8EBEE; --ink2:#A7B0BC; --line:#2E3744;
-    --bronze:#E7C070; --bronzeBg:#3A2E14; --rose:#F0A0A8; --roseBg:#3B2226; --teal:#7FD0C5; --tealBg:#153029;
-    --focus:#7EA6FF; --scrim:rgba(0,0,0,.65); --bubbleIn:#232B36; --bubbleOut:#1D3A33; --chat:#161C24;
+    --ground:#10111C; --surface:#181A2A; --sunk:#1F2133; --ink:#ECEEF8; --ink2:#9195B8; --line:#2A2D42;
+    --accent:#5B8FF9; --onAccent:#0B1024; --accentBg:#1C2742;
+    --gold:var(--accent); --onGold:var(--onAccent);
+    --bronze:#D8B463; --bronzeBg:#302A16; --rose:#E0858C; --roseBg:#35211F; --teal:#4FC98A; --tealBg:#15301F;
+    --focus:#7EA6FF; --scrim:rgba(0,0,0,.6); --bubbleIn:#1F2133; --bubbleOut:var(--accentBg); --chat:#14151F;
+    --sidebar-bg:#07081A; --sidebar-ink:#ECEEF8; --sidebar-ink2:#80849E; --sidebar-line:rgba(255,255,255,.07); --sidebar-active:var(--accent);
   }
 }
 html{height:100%}
@@ -39,16 +51,20 @@ button{cursor:pointer}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 .shell{display:grid;grid-template-columns:224px minmax(0,1fr);min-height:100%}
-.side{position:sticky;top:0;align-self:start;padding:22px 14px;display:flex;flex-direction:column;gap:22px}
-.brand{padding:0 10px}
-.brand b{font-family:var(--display);font-size:20px;letter-spacing:-.02em;display:block}
-.brand span{font-size:13px;color:var(--ink2)}
+.side{position:sticky;top:0;align-self:start;padding:0;display:flex;flex-direction:column;background:var(--sidebar-bg);min-height:100vh;color:var(--sidebar-ink)}
+.brand{background:#FFFFFF;padding:16px 14px}
+.brand img{width:100%;max-width:190px;height:auto;display:block}
+.side-body{padding:18px 14px 22px;display:flex;flex-direction:column;gap:18px}
+.side-caption{font-size:12px;color:var(--sidebar-ink2);padding:0 10px;margin-top:-6px}
 .nav{display:flex;flex-direction:column;gap:2px}
-.nav button{display:flex;align-items:center;gap:12px;padding:10px 12px;border:0;background:none;border-radius:8px;text-align:left;color:var(--ink2);font-weight:500}
-.nav button:hover{background:var(--sunk);color:var(--ink)}
-.nav button[aria-current="page"]{background:var(--ink);color:var(--surface)}
+.nav button{display:flex;align-items:center;gap:12px;padding:10px 12px;border:0;background:none;border-radius:8px;text-align:left;color:var(--sidebar-ink2);font-weight:500}
+.nav button:hover{background:rgba(255,255,255,.06);color:var(--sidebar-ink)}
+.nav button[aria-current="page"]{background:var(--sidebar-active);color:var(--onAccent)}
 .nav svg,.tabbar svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.sidenote{margin:0 10px;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--ink2);display:flex;flex-direction:column;gap:8px}
+.sidenote{margin:0 10px;padding:12px;border:1px solid var(--sidebar-line);border-radius:10px;font-size:13px;color:var(--sidebar-ink2);display:flex;flex-direction:column;gap:8px}
+.sidenote .btn.ghost{color:var(--sidebar-ink);border-color:var(--sidebar-line)}
+.sidenote .btn.ghost:hover{background:rgba(255,255,255,.08)}
+.sidenote p.small{color:var(--sidebar-ink2)}
 main{padding:22px 28px 60px;min-width:0}
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;margin-bottom:22px}
 .top .who{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -77,7 +93,7 @@ label.f span.h{font-weight:400}
 .small{font-size:13px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .spread{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
 .panel > h2{margin-bottom:12px}
 .grid2{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
 .stack{display:flex;flex-direction:column;gap:18px}
@@ -175,7 +191,7 @@ th{font-weight:600;color:var(--ink2);border-top:0;font-size:13px}
   .grid2{grid-template-columns:1fr}
   .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
   .tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;color:var(--ink2);font-size:11.5px;min-height:48px}
-  .tabbar button[aria-current="page"]{color:var(--ink);font-weight:700}
+  .tabbar button[aria-current="page"]{color:var(--accent);font-weight:700}
   .sheet{padding:14px 14px 30px}
   .form{grid-template-columns:1fr}
   .col{flex-basis:78vw}
@@ -215,13 +231,20 @@ var TITLES={today:'Today',jobs:'Job board',enq:'Enquiries',sched:'Schedule',repo
 /* ------------------------------------------------------------------ state */
 var CFG=window.APP_CONFIG||{};
 var sb=null;
-var S={me:null,ref:{},staff:[],jobs:[],cancelled:[],enq:[],workload:[],inbox:[],files:{},urls:{},msgs:{},view:'today',locFilter:'all',modal:null,toast:null,busy:false,focusModal:false};
+var S={me:null,ref:{},staff:[],jobs:[],cancelled:[],enq:[],workload:[],inbox:[],historyToday:[],briefTab:null,pushState:'unknown',pushBusy:false,files:{},urls:{},msgs:{},view:'today',locFilter:'all',modal:null,toast:null,busy:false,focusModal:false};
 
 /* ------------------------------------------------------------------ helpers */
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function inr(n){return '\u20B9'+Math.round(Number(n)||0).toLocaleString('en-IN');}
 function todayISO(){return new Date(Date.now()+5.5*3600*1000).toISOString().slice(0,10);}
+function istMidnightISO(offsetDays){
+  var ist=new Date(Date.now()+5.5*3600*1000);
+  var mid=Date.UTC(ist.getUTCFullYear(),ist.getUTCMonth(),ist.getUTCDate()+(offsetDays||0),0,0,0);
+  return new Date(mid-5.5*3600*1000).toISOString();
+}
+function istHourNow(){return new Date(Date.now()+5.5*3600*1000).getUTCHours();}
+function staffName(id){var s=(S.staff||[]).filter(function(x){return x.id===id;})[0];return s?s.name:'System';}
 function addISO(iso,n){var d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 function diffISO(a,b){return Math.round((new Date(a+'T00:00:00Z')-new Date(b+'T00:00:00Z'))/86400000);}
 function dt(iso){return iso&&iso.length===10?new Date(iso+'T00:00:00'):new Date(iso);}
@@ -250,6 +273,53 @@ function toast(msg,err){
   clearTimeout(toast.t);toast.t=setTimeout(function(){S.toast=null;var e=$('toast');if(e)e.remove();},4200);
 }
 function fail(e){toast((e&&e.message)?e.message:String(e),true);}
+function pushSupported(){return 'serviceWorker' in navigator && 'PushManager' in window && !!(CFG.VAPID_PUBLIC_KEY) && CFG.VAPID_PUBLIC_KEY.indexOf('YOUR-')!==0;}
+function iosNeedsHomeScreen(){
+  var ua=navigator.userAgent||'';
+  var isIOS=/iPhone|iPad|iPod/.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  var standalone=('standalone' in navigator && navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
+  return isIOS && !standalone;
+}
+function b64urlToBytes(s){
+  var pad='='.repeat((4-s.length%4)%4);
+  var b=(s+pad).replace(/-/g,'+').replace(/_/g,'/');
+  var raw=atob(b),out=new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+  return out;
+}
+async function refreshPushState(){
+  if(!pushSupported()){S.pushState=iosNeedsHomeScreen()?'ios-need-home-screen':'unsupported';return;}
+  try{
+    var reg=await navigator.serviceWorker.register('sw.js');
+    var sub=await reg.pushManager.getSubscription();
+    S.pushState=sub?'on':(Notification.permission==='denied'?'denied':'off');
+  }catch(e){S.pushState='unsupported';}
+}
+async function enablePush(){
+  if(S.pushBusy)return;S.pushBusy=true;render();
+  try{
+    var reg=await navigator.serviceWorker.register('sw.js');
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){S.pushState=perm==='denied'?'denied':'off';S.pushBusy=false;render();return;}
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64urlToBytes(CFG.VAPID_PUBLIC_KEY)});
+    var j=sub.toJSON();
+    var r=await sb.from('push_subscriptions').insert({staff_id:S.me.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth});
+    if(r.error && r.error.code!=='23505')throw r.error;
+    S.pushState='on';toast('Daily reminders are on for this device.');
+  }catch(e){fail(e);}
+  S.pushBusy=false;render();
+}
+async function disablePush(){
+  if(S.pushBusy)return;S.pushBusy=true;render();
+  try{
+    var reg=await navigator.serviceWorker.getRegistration();
+    var sub=reg?await reg.pushManager.getSubscription():null;
+    if(sub){await sb.from('push_subscriptions').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe();}
+    S.pushState='off';toast('Daily reminders turned off for this device.');
+  }catch(e){fail(e);}
+  S.pushBusy=false;render();
+}
 
 /* ------------------------------------------------------------------ boot */
 function boot(){
@@ -286,6 +356,7 @@ async function start(session){
   }
   S.me=r.data;
   render();
+  refreshPushState().then(render);
   await loadAll(false);
 }
 
@@ -309,7 +380,8 @@ async function loadAll(silent){
       q(sb.from('job_files').select('*').order('created_at')),
       q(sb.from('enquiries').select('*').order('created_at',{ascending:false})),
       q(sb.from('v_workload').select('*')),
-      S.me.role==='admin'?q(sb.from('booking_inbox').select('*').eq('status','failed').order('received_at',{ascending:false})):Promise.resolve([])
+      S.me.role==='admin'?q(sb.from('booking_inbox').select('*').eq('status','failed').order('received_at',{ascending:false})):Promise.resolve([]),
+      q(sb.from('job_stage_history').select('*').gte('changed_at',istMidnightISO(0)).lt('changed_at',istMidnightISO(1)).order('changed_at'))
     ]);
     S.ref={locations:r[0],services:r[1],frames:r[2],addons:r[3],stages:r[4]};
     S.staff=r[5];
@@ -336,6 +408,8 @@ async function loadAll(silent){
     S.enq=r[12].map(function(e){var sv=svc[e.service_id]||{};return Object.assign({},e,{service:sv.name||'',loc:(loc[e.location_id]||{}).name||''});});
     S.workload=r[13];
     S.inbox=r[14]||[];
+    S.historyToday=r[15]||[];
+    if(!S.briefTab)S.briefTab=istHourNow()<13?'morning':'evening';
     if(S.modal&&S.modal.type==='job'){ensureUrls(jobById(S.modal.id));loadMsgs(S.modal.id);}
   }catch(e){fail(e);}
   S.busy=false;render();
@@ -369,9 +443,9 @@ function flags(j){
   return f;
 }
 function dayText(j){var d=j.day_no;return d<0?'In '+(-d)+' day'+(d===-1?'':'s'):(d===0?'Session today':'Day '+d);}
-function needs(){
+function needs(list){
   var out=[];
-  vJobs().forEach(function(j){
+  (list||vJobs()).forEach(function(j){
     if(j.stage==='delivered')return;
     var fl=flags(j),rank=9;
     fl.forEach(function(f){if(f.t==='call')rank=Math.min(rank,0);if(f.t==='late')rank=Math.min(rank,1);if(f.t==='change')rank=Math.min(rank,2);});
@@ -383,6 +457,30 @@ function needs(){
   });
   out.sort(function(a,b){return a.rank-b.rank;});
   return out;
+}
+function locationsInScope(){
+  if(isAdmin())return (S.ref.locations||[]).filter(function(l){return S.locFilter==='all'||l.id===Number(S.locFilter);});
+  return (S.ref.locations||[]).filter(function(l){return l.id===S.me.location_id;});
+}
+function personFor(locId){var s=S.staff.filter(function(x){return x.location_id===locId&&x.active;})[0];return s?s.name:'Unassigned';}
+function morningPlan(locId){
+  var t=todayISO(),jobs=S.jobs.filter(function(j){return j.location_id===locId&&j.stage!=='delivered';});
+  return {
+    sessions:jobs.filter(function(j){return j.stage==='booked'&&j.casting_date===t;}).sort(function(a,b){return a.sessionAt<b.sessionAt?-1:1;}),
+    need:needs(jobs),
+    fu:S.enq.filter(function(x){return x.location_id===locId&&x.next_follow_up&&x.next_follow_up<=t&&x.status!=='booked'&&x.status!=='lost';}),
+    due:jobs.filter(function(j){return j.stage!=='booked'&&diffISO(j.promised_delivery,t)<=1;})
+  };
+}
+function eveningReview(locId){
+  var t=todayISO(),tmr=addISO(t,1);
+  var jobs=S.jobs.filter(function(j){return j.location_id===locId;});
+  return {
+    done:S.historyToday.filter(function(h){return h.location_id===locId;}).map(function(h){return {job:jobById(h.job_id),from:h.from_stage,to:h.to_stage,at:h.changed_at,who:staffName(h.changed_by)};}).filter(function(x){return x.job;}),
+    open:needs(jobs.filter(function(j){return j.stage!=='delivered';})),
+    tomorrowSessions:jobs.filter(function(j){return j.stage==='booked'&&j.casting_date===tmr;}).sort(function(a,b){return a.sessionAt<b.sessionAt?-1:1;}),
+    tomorrowFu:S.enq.filter(function(x){return x.location_id===locId&&x.next_follow_up===tmr;})
+  };
 }
 function actionLabel(j){
   switch(j.stage){
@@ -462,6 +560,37 @@ async function uploadFile(j,kind,file){
 }
 
 /* ------------------------------------------------------------------ views */
+function briefRow(icon,text,extra){return '<div class="item"><div class="t"><b>'+text+'</b>'+(extra?'<span class="muted small">'+extra+'</span>':'')+'</div></div>';}
+function vDailyBrief(){
+  var locs=locationsInScope();
+  var h='<div class="panel" style="margin-bottom:18px"><div class="spread"><h2>Daily plan</h2><div class="row" style="gap:6px">'+
+    '<button class="btn sm '+(S.briefTab==='morning'?'gold':'ghost')+'" data-a="brief-tab" data-v="morning">Morning plan</button>'+
+    '<button class="btn sm '+(S.briefTab==='evening'?'gold':'ghost')+'" data-a="brief-tab" data-v="evening">Evening close-out</button></div></div>';
+  if(!locs.length)h+='<div class="empty">No location to show.</div>';
+  locs.forEach(function(loc,i){
+    h+='<div style="margin-top:'+(i?'18':'14')+'px;'+(i?'padding-top:14px;border-top:1px solid var(--line)':'')+'"><div class="spread"><h3>'+esc(loc.name)+'</h3><span class="muted small">'+esc(personFor(loc.id))+'</span></div>';
+    if(S.briefTab==='morning'){
+      var p=morningPlan(loc.id);
+      h+='<p class="small muted" style="margin-top:8px">Today\u2019s sessions</p>';
+      h+=p.sessions.length?'<div class="list">'+p.sessions.map(function(j){return briefRow(0,esc(fmtTime(j.sessionAt))+' \u00B7 '+esc(j.customer),esc(shortSvc(j.service)));}).join('')+'</div>':'<div class="empty">No sessions today.</div>';
+      h+='<p class="small muted" style="margin-top:12px">Needs attention ('+p.need.length+')</p>';
+      h+=p.need.length?'<div class="list">'+p.need.slice(0,6).map(function(n){return briefRow(0,esc(n.j.customer)+' \u00B7 '+esc(STAGE_NAMES[n.j.stage]),n.reasons.map(chip).join(' '));}).join('')+'</div>':'<div class="empty">Nothing outstanding.</div>';
+      if(p.fu.length)h+='<p class="small muted" style="margin-top:12px">Follow-ups due ('+p.fu.length+')</p><div class="list">'+p.fu.map(function(x){return briefRow(0,esc(x.name),esc(shortSvc(x.service)));}).join('')+'</div>';
+      if(p.due.length)h+='<p class="small muted" style="margin-top:12px">Deliveries due today or tomorrow ('+p.due.length+')</p><div class="list">'+p.due.map(function(j){return briefRow(0,esc(j.customer),esc(fmt(j.promised_delivery)));}).join('')+'</div>';
+    }else{
+      var e=eveningReview(loc.id);
+      h+='<p class="small muted" style="margin-top:8px">Moved forward today ('+e.done.length+')</p>';
+      h+=e.done.length?'<div class="list">'+e.done.map(function(x){return briefRow(0,esc(x.job.customer)+': '+esc(STAGE_NAMES[x.from]||'New')+' \u2192 '+esc(STAGE_NAMES[x.to]),esc(x.who)+' \u00B7 '+esc(fmtTime(x.at)));}).join('')+'</div>':'<div class="empty">No stage changes yet today.</div>';
+      h+='<p class="small muted" style="margin-top:12px">Still open ('+e.open.length+')</p>';
+      h+=e.open.length?'<div class="list">'+e.open.slice(0,6).map(function(n){return briefRow(0,esc(n.j.customer)+' \u00B7 '+esc(STAGE_NAMES[n.j.stage]),n.reasons.map(chip).join(' '));}).join('')+'</div>':'<div class="empty">Nothing left open.</div>';
+      h+='<p class="small muted" style="margin-top:12px">Tomorrow\u2019s sessions ('+e.tomorrowSessions.length+')</p>';
+      h+=e.tomorrowSessions.length?'<div class="list">'+e.tomorrowSessions.map(function(j){return briefRow(0,esc(fmtTime(j.sessionAt))+' \u00B7 '+esc(j.customer),esc(shortSvc(j.service)));}).join('')+'</div>':'<div class="empty">Nothing booked yet.</div>';
+      if(e.tomorrowFu.length)h+='<p class="small muted" style="margin-top:12px">Follow-ups due tomorrow ('+e.tomorrowFu.length+')</p><div class="list">'+e.tomorrowFu.map(function(x){return briefRow(0,esc(x.name),esc(shortSvc(x.service)));}).join('')+'</div>';
+    }
+    h+='</div>';
+  });
+  return h+'</div>';
+}
 function vToday(){
   var jobs=vJobs(),active=jobs.filter(function(j){return j.stage!=='delivered';});
   var wait=active.filter(function(j){return j.waiting_on_customer;}).length;
@@ -469,7 +598,7 @@ function vToday(){
   var due=active.filter(function(j){return j.stage!=='booked'&&diffISO(j.promised_delivery,t)<=7;}).length;
   var fu=vEnq().filter(function(x){return x.next_follow_up&&x.next_follow_up<=t&&x.status!=='booked'&&x.status!=='lost';});
   var nd=needs();
-  var h='';
+  var h=vPushBanner()+vDailyBrief();
   if(isAdmin()&&S.inbox.length){
     h+='<div class="panel" style="margin-bottom:18px;border-color:var(--rose)"><h2>Website bookings needing attention</h2><p class="muted small" style="margin-bottom:10px">These came from the website but could not become a job automatically.</p><div class="list">'+
       S.inbox.map(function(x){var p=x.payload||{};return '<div class="item"><div class="t"><b>'+esc(p.customer_name||'Unknown customer')+'</b><span class="muted small">'+esc(p.service||'')+' \u00B7 '+esc(p.location||'')+' \u00B7 '+esc(x.received_at?fmtShort(String(x.received_at).slice(0,10)):'')+'</span><div class="row" style="margin-top:6px"><span class="chip late">'+esc(x.error||'Failed')+'</span></div></div><div class="row"><button class="btn sm gold" data-a="inbox-book" data-id="'+x.id+'">Enter as booking</button><button class="btn sm ghost" data-a="inbox-dismiss" data-id="'+x.id+'">Dismiss</button></div></div>';}).join('')+'</div></div>';
@@ -565,7 +694,8 @@ function vReports(){
 }
 function vSettings(){
   var R=S.ref;
-  var h='<div class="stack"><div class="panel"><h2>Staff</h2><div class="tablewrap"><table><thead><tr><th>Person</th><th>Role</th><th>Location</th><th>Phone</th></tr></thead><tbody>'+
+  var pushCard='<div class="panel"><h2>Daily reminders on this device</h2><p class="muted small" style="margin-bottom:10px">A short notification at 9am and 5pm summarising sessions and jobs needing attention, even when the tracker is closed. This is set up per device, so turn it on separately on your phone and your computer if you use both.</p>'+pushWidget('')+'</div>';
+  var h='<div class="stack">'+pushCard+'<div class="panel"><h2>Staff</h2><div class="tablewrap"><table><thead><tr><th>Person</th><th>Role</th><th>Location</th><th>Phone</th></tr></thead><tbody>'+
     S.staff.map(function(s){return '<tr><td>'+esc(s.name)+'</td><td>'+(s.role==='admin'?'Admin':'Location staff')+'</td><td>'+esc(locName(s.location_id))+'</td><td>'+esc(s.phone||'')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
   h+='<div class="panel"><h2>Services and prices (incl. 5% GST)</h2><div class="tablewrap"><table><thead><tr><th>Service</th><th>Duration</th><th>Price</th></tr></thead><tbody>'+
     (R.services||[]).map(function(s){return '<tr><td>'+esc(s.name)+'</td><td>'+esc(s.duration_hours)+' hr</td><td>'+(s.is_from_price?'from ':'')+inr(s.price_incl_gst)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
@@ -621,6 +751,7 @@ function stageControls(j){
   var lay=jobFiles(j,'layout').length,qc=jobFiles(j,'qc').length;
   h+='<div class="row" style="margin-top:14px">';
   if(j.stage==='layout_ready'||(j.stage==='awaiting_approval'&&j.approval==='changes'))h+=up('layout',lay?'Upload another layout':'Upload layout');
+  if(j.stage==='awaiting_approval'&&j.approval==='pending'&&isAdmin())h+='<button class="btn gold" data-a="mark-approved" data-id="'+j.id+'">Mark approved</button>';
   if(j.stage==='quality_check'){
     h+=up('qc',qc?'Upload another QC photo':'Upload QC photo');
     if(!j.qc_approved){
@@ -706,6 +837,11 @@ function vCancel(j){
    '<label class="f" style="margin-top:12px">Note (optional)<input type="text" id="c-note" autocomplete="off"></label>'+
    '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Keep the booking</button><button class="btn" data-a="confirm-cancel" data-id="'+j.id+'" style="background:var(--rose);border-color:var(--rose);color:#fff">Cancel booking</button></div>';
 }
+function vApprove(j){
+  return '<h2 id="dlgt">Mark '+esc(j.job_no)+' as approved?</h2><p class="muted small" style="margin:4px 0 16px">Use this only when the customer has confirmed by phone, in person, or another way outside WhatsApp. This unlocks final fixing.</p>'+
+   '<label class="f">How did the customer confirm? (kept in the job notes)<textarea id="ap-note" placeholder="e.g. Confirmed by phone call today"></textarea></label>'+
+   '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn gold" data-a="confirm-approve" data-id="'+j.id+'">Mark approved</button></div>';
+}
 function vLost(x){
   return '<h2 id="dlgt">Why was '+esc(x.name)+' lost?</h2><p class="muted small" style="margin:4px 0 16px">A reason helps you see patterns in the report.</p><label class="f">Reason<select id="l-reason">'+opt(LOST_REASONS,'Price')+'</select></label>'+
    '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn" data-a="save-lost" data-id="'+x.id+'">Mark as lost</button></div>';
@@ -715,9 +851,9 @@ function vLost(x){
 function render(){
   if(!S.me)return;
   var app=$('app'),board=$('board'),bl=board?board.scrollLeft:0,sy=window.scrollY;
-  var u=S.me,h='<div class="shell"><aside class="side"><div class="brand"><b>Lifeimpressions</b><span>Studio tracker</span></div><nav class="nav" aria-label="Main">'+
+  var u=S.me,h='<div class="shell"><aside class="side"><div class="brand"><img src="brand-logo.png" alt="Lifeimpressions"></div><div class="side-body"><span class="side-caption">Studio tracker</span><nav class="nav" aria-label="Main">'+
     NAV.map(function(n){return '<button data-a="nav" data-v="'+n[0]+'"'+(S.view===n[0]?' aria-current="page"':'')+'>'+svg(n[2])+n[1]+'</button>';}).join('')+
-    '</nav><div class="sidenote"><span>Signed in as <b>'+esc(u.name)+'</b><br>'+(u.role==='admin'?'Admin, all locations':esc(locName(u.location_id)))+'</span><button class="btn sm ghost" data-a="signout">Sign out</button></div></aside><main class="'+(S.busy?'busy':'')+'">';
+    '</nav><div class="sidenote"><span style="color:var(--sidebar-ink)">Signed in as <b style="color:var(--sidebar-ink)">'+esc(u.name)+'</b><br>'+(u.role==='admin'?'Admin, all locations':esc(locName(u.location_id)))+'</span>'+pushWidget('sm')+'<button class="btn sm ghost" data-a="signout">Sign out</button></div></div></aside><main class="'+(S.busy?'busy':'')+'">';
   h+='<div class="top"><h1>'+TITLES[S.view]+'</h1><div class="who">';
   if(u.role==='admin')h+='<label class="field-inline">Location <select data-change="loc" aria-label="Location">'+opt([{v:'all',l:'All locations'}].concat((S.ref.locations||[]).map(function(l){return {v:l.id,l:l.name};})),S.locFilter)+'</select></label>';
   h+='<button class="btn ghost" data-a="refresh">Refresh</button>';
@@ -729,7 +865,7 @@ function render(){
   if(S.modal){
     var m=S.modal;
     if(m.type==='job'){var j=jobById(m.id);if(j)h+='<div class="overlay" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Job '+esc(j.job_no)+'" tabindex="-1" id="modal">'+vJob(j)+'</div></div>';}
-    else{var body=m.type==='booking'?vBooking(m.pre):(m.type==='enq'?vEnqForm():(m.type==='cancel'?vCancel(jobById(m.id)):vLost(enqById(m.id))));h+='<div class="overlay center" data-a="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgt" tabindex="-1" id="modal">'+body+'</div></div>';}
+    else{var body=m.type==='booking'?vBooking(m.pre):(m.type==='enq'?vEnqForm():(m.type==='cancel'?vCancel(jobById(m.id)):(m.type==='approve'?vApprove(jobById(m.id)):vLost(enqById(m.id)))));h+='<div class="overlay center" data-a="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgt" tabindex="-1" id="modal">'+body+'</div></div>';}
   }
   var me=$('msgs'),keep=me?me.scrollTop:0,atEnd=me?(me.scrollHeight-me.scrollTop-me.clientHeight<40):true;
   var sheet=document.querySelector('.sheet'),sk=sheet?sheet.scrollTop:0;
@@ -742,6 +878,18 @@ function render(){
   if(S.modal&&S.focusModal){var mm=$('modal');if(mm){var f=mm.querySelector('input[type=text],select:not([disabled]),button');(f||mm).focus();}S.focusModal=false;}
   else if(focusId&&S.modal){var fe=$(focusId);if(fe&&fe.focus)fe.focus();}
   if(S.modal&&S.modal.type==='booking')updateSummary();
+}
+function pushWidget(size){
+  var b='btn '+(size||'')+' ghost';
+  if(S.pushState==='on')return '<button class="'+b+'" data-a="push-off"'+(S.pushBusy?' disabled':'')+'>Turn off daily reminders</button>';
+  if(S.pushState==='denied')return '<p class="small muted">Reminders are blocked in this browser\u2019s settings. Allow notifications for this site, then reload.</p>';
+  if(S.pushState==='ios-need-home-screen')return '<p class="small muted">On iPhone: tap Share, then \u201CAdd to Home Screen\u201D, and open the app from there to turn on reminders.</p>';
+  if(S.pushState==='unsupported')return '<p class="small muted">This browser cannot show reminders. They still work on the app once opened.</p>';
+  return '<button class="btn '+(size||'')+' gold" data-a="push-on"'+(S.pushBusy?' disabled':'')+'>Turn on daily reminders</button>';
+}
+function vPushBanner(){
+  if(S.pushState!=='off')return '';
+  return '<div class="panel" style="margin-bottom:18px"><div class="spread"><div><h2>Get a reminder without opening the app</h2><p class="muted small" style="margin-top:4px">A short notification at 9am and 5pm, even when the tracker is closed. Tap it to jump straight in.</p></div>'+pushWidget('')+'</div></div>';
 }
 function openModal(m){S.modal=m;S.focusModal=true;if(m.type==='job'){var j=jobById(m.id);ensureUrls(j);loadMsgs(m.id);}render();}
 function closeModal(){S.modal=null;render();}
@@ -758,8 +906,11 @@ document.addEventListener('click',async function(ev){
     case 'open-job':openModal({type:'job',id:id});break;
     case 'close':closeModal();break;
     case 'signout':await sb.auth.signOut();break;
+    case 'push-on':await enablePush();break;
+    case 'push-off':await disablePush();break;
     case 'refresh':await loadAll(false);break;
     case 'reload-msgs':loadMsgs(id);break;
+    case 'brief-tab':S.briefTab=el.getAttribute('data-v');render();break;
     case 'new-booking':openModal({type:'booking',pre:{}});break;
     case 'inbox-book':{
       var row=S.inbox.filter(function(x){return String(x.id)===id;})[0],pl=(row&&row.payload)||{};
@@ -777,6 +928,14 @@ document.addEventListener('click',async function(ev){
       if(ra.error)throw ra.error;await refreshAfter('Advance saved.');break;}
     case 'new-enq':openModal({type:'enq'});break;
     case 'cancel-booking':openModal({type:'cancel',id:id});break;
+    case 'mark-approved':openModal({type:'approve',id:id});break;
+    case 'confirm-approve':{
+      var jb=jobById(id),note=$('ap-note').value.trim();
+      var stamp=new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+      var line='['+stamp+'] Approved manually by '+S.me.name+(note?': '+note:' (no note given)');
+      var ra2=await sb.from('jobs').update({approval:'approved',stage:'final_fixing',notes:(jb.notes?jb.notes+'\n':'')+line}).eq('id',id);
+      if(ra2.error)throw ra2.error;
+      S.modal=null;await refreshAfter('Marked approved. Final fixing is unlocked.');break;}
     case 'confirm-cancel':{
       var note=$('c-note').value.trim(),why=$('c-reason').value+(note?' - '+note:'');
       var rc=await sb.from('jobs').update({cancelled_at:new Date().toISOString(),cancel_reason:why}).eq('id',id);
