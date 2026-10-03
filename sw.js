@@ -34,11 +34,16 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || APP_URL;
+  const base = (event.notification.data && event.notification.data.url) || APP_URL;
+  // Always land on Today, whether the tap opens a fresh tab or focuses one already open.
+  const target = base + (base.includes('#') ? '' : '#today');
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {
-        if (client.url.startsWith(APP_URL) && 'focus' in client) return client.focus();
+        if (client.url.startsWith(APP_URL) && 'focus' in client) {
+          if ('postMessage' in client) client.postMessage({ type: 'navigate', view: 'today' });
+          return client.focus();
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(target);
     })

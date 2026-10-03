@@ -355,6 +355,7 @@ async function start(session){
     return;
   }
   S.me=r.data;
+  if(location.hash==='#today'){S.view='today';history.replaceState(null,'',location.pathname+location.search);}
   render();
   refreshPushState().then(render);
   await loadAll(false);
@@ -999,6 +1000,15 @@ document.addEventListener('change',async function(ev){
 });
 document.addEventListener('input',function(ev){if(S.modal&&S.modal.type==='booking'&&ev.target.id==='b-adv')updateSummary();});
 document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&S.modal)closeModal();});
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',function(ev){
+    if(ev.data&&ev.data.type==='navigate'&&ev.data.view){
+      S.view=ev.data.view;S.modal=null;
+      if(S.me){render();window.scrollTo(0,0);}
+    }
+  });
+}
 
 boot();
 })();
