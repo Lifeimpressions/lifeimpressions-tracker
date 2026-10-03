@@ -225,6 +225,7 @@ var ENQ_LABEL={new:'New',contacted:'Contacted',quoted:'Quoted',booked:'Booked',l
 var SRC_KEYS=['instagram','whatsapp','website','referral','walk_in','call','other'];
 var SRC_LABEL={instagram:'Instagram',whatsapp:'WhatsApp',website:'Website',referral:'Referral',walk_in:'Walk-in',call:'Call',other:'Other'};
 var LOST_REASONS=['Price','Date not available','Chose a competitor','No reply','Other'];
+var REMIND_MSG='Dear customer, you have enquired about our service. Would you like to book right now? Visit our website https://www.lifeimpressions.in/book-online to book your desired service. Thanks.';
 var BUCKET='job-files';
 var ICON={
   today:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -253,6 +254,12 @@ function istMidnightISO(offsetDays){
   return new Date(mid-5.5*3600*1000).toISOString();
 }
 function istHourNow(){return new Date(Date.now()+5.5*3600*1000).getUTCHours();}
+function waLink(phone,text){
+  var d=String(phone||'').replace(/\D/g,'');
+  if(!d)return null;
+  if(d.length===10)d='91'+d;
+  return 'https://wa.me/'+d+'?text='+encodeURIComponent(text);
+}
 function staffName(id){var s=(S.staff||[]).filter(function(x){return x.id===id;})[0];return s?s.name:'System';}
 function addISO(iso,n){var d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 function diffISO(a,b){return Math.round((new Date(a+'T00:00:00Z')-new Date(b+'T00:00:00Z'))/86400000);}
@@ -649,7 +656,9 @@ function enqCard(x){
   var h='<div class="card enq"><b>'+esc(x.name)+'</b><span class="meta"><span>'+esc(shortSvc(x.service))+'</span></span>'+
     '<span class="flags"><span class="chip src">'+esc(SRC_LABEL[x.source])+'</span><span class="chip src">'+esc(x.loc)+'</span>'+(x.lost_reason?'<span class="chip late">'+esc(x.lost_reason)+'</span>':'')+'</span>';
   if(x.next_follow_up)h+='<span class="small '+(late?'':'muted')+'">'+(late?'<span class="chip late">Follow-up overdue</span> ':'Follow up ')+esc(fmt(x.next_follow_up))+'</span>';
-  h+='<label class="sr" for="es-'+x.id+'">Status for '+esc(x.name)+'</label><select id="es-'+x.id+'" data-change="enq-status" data-id="'+x.id+'">'+ENQ_STATUS.map(function(s){return '<option value="'+s+'"'+(s===x.status?' selected':'')+'>'+ENQ_LABEL[s]+'</option>';}).join('')+'</select></div>';
+  h+='<label class="sr" for="es-'+x.id+'">Status for '+esc(x.name)+'</label><select id="es-'+x.id+'" data-change="enq-status" data-id="'+x.id+'">'+ENQ_STATUS.map(function(s){return '<option value="'+s+'"'+(s===x.status?' selected':'')+'>'+ENQ_LABEL[s]+'</option>';}).join('')+'</select>';
+  if(x.status==='contacted'||x.status==='quoted')h+='<button class="btn sm ghost" data-a="open-remind" data-id="'+x.id+'" style="margin-top:8px">Remind</button>';
+  h+='</div>';
   return h;
 }
 function vEnquiries(){
@@ -852,6 +861,13 @@ function vApprove(j){
    '<label class="f">How did the customer confirm? (kept in the job notes)<textarea id="ap-note" placeholder="e.g. Confirmed by phone call today"></textarea></label>'+
    '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn gold" data-a="confirm-approve" data-id="'+j.id+'">Mark approved</button></div>';
 }
+function vRemind(x){
+  var has=!!String(x.whatsapp||'').trim();
+  return '<h2 id="dlgt">Remind '+esc(x.name)+'?</h2><p class="muted small" style="margin:4px 0 16px">This opens WhatsApp with the message below, ready to send to '+(has?esc(x.whatsapp):'their number')+'. You can edit it first.</p>'+
+   (has?'':'<div class="rule" style="margin-bottom:12px">No WhatsApp number is on file for this enquiry. Add one before sending.</div>')+
+   '<label class="f">Message<textarea id="rm-text" rows="5">'+esc(REMIND_MSG)+'</textarea></label>'+
+   '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn gold" data-a="send-remind" data-id="'+x.id+'"'+(has?'':' disabled')+'>Notify</button></div>';
+}
 function vLost(x){
   return '<h2 id="dlgt">Why was '+esc(x.name)+' lost?</h2><p class="muted small" style="margin:4px 0 16px">A reason helps you see patterns in the report.</p><label class="f">Reason<select id="l-reason">'+opt(LOST_REASONS,'Price')+'</select></label>'+
    '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn" data-a="save-lost" data-id="'+x.id+'">Mark as lost</button></div>';
@@ -875,7 +891,7 @@ function render(){
   if(S.modal){
     var m=S.modal;
     if(m.type==='job'){var j=jobById(m.id);if(j)h+='<div class="overlay" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Job '+esc(j.job_no)+'" tabindex="-1" id="modal">'+vJob(j)+'</div></div>';}
-    else{var body=m.type==='booking'?vBooking(m.pre):(m.type==='enq'?vEnqForm():(m.type==='cancel'?vCancel(jobById(m.id)):(m.type==='approve'?vApprove(jobById(m.id)):vLost(enqById(m.id)))));h+='<div class="overlay center" data-a="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgt" tabindex="-1" id="modal">'+body+'</div></div>';}
+    else{var body=m.type==='booking'?vBooking(m.pre):(m.type==='enq'?vEnqForm():(m.type==='cancel'?vCancel(jobById(m.id)):(m.type==='approve'?vApprove(jobById(m.id)):(m.type==='remind'?vRemind(enqById(m.id)):vLost(enqById(m.id))))));h+='<div class="overlay center" data-a="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgt" tabindex="-1" id="modal">'+body+'</div></div>';}
   }
   var me=$('msgs'),keep=me?me.scrollTop:0,atEnd=me?(me.scrollHeight-me.scrollTop-me.clientHeight<40):true;
   var sheet=document.querySelector('.sheet'),sk=sheet?sheet.scrollTop:0;
@@ -939,7 +955,19 @@ document.addEventListener('click',async function(ev){
       if(ra.error)throw ra.error;await refreshAfter('Advance saved.');break;}
     case 'new-enq':openModal({type:'enq'});break;
     case 'cancel-booking':openModal({type:'cancel',id:id});break;
+    case 'open-remind':openModal({type:'remind',id:id});break;
     case 'mark-approved':openModal({type:'approve',id:id});break;
+    case 'send-remind':{
+      var ex=enqById(id),msg=$('rm-text').value.trim();
+      if(!msg){toast('Write a message first.',true);return;}
+      var link=waLink(ex.whatsapp,msg);
+      if(!link){toast('No WhatsApp number on file for this enquiry.',true);return;}
+      window.open(link,'_blank');
+      var stamp=new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+      var line='['+stamp+'] Reminder sent by '+S.me.name;
+      var rn=await sb.from('enquiries').update({notes:(ex.notes?ex.notes+'\n':'')+line}).eq('id',id);
+      if(rn.error)throw rn.error;
+      S.modal=null;await refreshAfter('Reminder opened in WhatsApp for '+ex.name+'.');break;}
     case 'confirm-approve':{
       var jb=jobById(id),note=$('ap-note').value.trim();
       var stamp=new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
