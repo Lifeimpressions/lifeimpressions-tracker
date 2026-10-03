@@ -175,6 +175,7 @@ th{font-weight:600;color:var(--ink2);border-top:0;font-size:13px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:50;background:var(--ink);color:var(--surface);padding:11px 16px;border-radius:10px;max-width:min(560px,92vw);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .toast.err{background:var(--rose);color:#fff}
 .tabbar{display:none}
+.mobile-brand{display:none}
 .center-page{min-height:100vh;display:grid;place-items:center;padding:20px}
 .login{width:min(400px,100%);display:flex;flex-direction:column;gap:16px}
 .login .msg{color:var(--rose);font-size:14px;min-height:20px}
@@ -183,14 +184,17 @@ th{font-weight:600;color:var(--ink2);border-top:0;font-size:13px}
 @media (max-width:880px){
   .shell{grid-template-columns:1fr}
   .side{display:none}
+  .mobile-brand{display:flex;align-items:center;justify-content:center;background:#FFFFFF;padding:8px 14px;padding-top:calc(8px + env(safe-area-inset-top,0px));position:sticky;top:0;z-index:15;border-bottom:1px solid var(--line)}
+  .mobile-brand img{height:32px;width:auto;display:block}
   main{padding:16px 14px 110px}
   h1{font-size:25px}
   .stats{grid-template-columns:1fr 1fr}
   .stat:nth-child(2){border-right:0}
   .stat:nth-child(-n+2){border-bottom:1px solid var(--line)}
   .grid2{grid-template-columns:1fr}
-  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
-  .tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;color:var(--ink2);font-size:11.5px;min-height:48px}
+  .tabbar{display:grid;grid-template-columns:repeat(6,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:6px 2px calc(6px + env(safe-area-inset-bottom,0px))}
+  .tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;color:var(--ink2);font-size:10px;min-height:48px;padding:4px 1px;line-height:1.15}
+  .tabbar svg{width:18px;height:18px}
   .tabbar button[aria-current="page"]{color:var(--accent);font-weight:700}
   .sheet{padding:14px 14px 30px}
   .form{grid-template-columns:1fr}
@@ -852,7 +856,7 @@ function vLost(x){
 function render(){
   if(!S.me)return;
   var app=$('app'),board=$('board'),bl=board?board.scrollLeft:0,sy=window.scrollY;
-  var u=S.me,h='<div class="shell"><aside class="side"><div class="brand"><img src="brand-logo.png" alt="Lifeimpressions"></div><div class="side-body"><span class="side-caption">Studio tracker</span><nav class="nav" aria-label="Main">'+
+  var u=S.me,h='<div class="mobile-brand"><img src="brand-logo.png" alt="Lifeimpressions"></div><div class="shell"><aside class="side"><div class="brand"><img src="brand-logo.png" alt="Lifeimpressions"></div><div class="side-body"><span class="side-caption">Studio tracker</span><nav class="nav" aria-label="Main">'+
     NAV.map(function(n){return '<button data-a="nav" data-v="'+n[0]+'"'+(S.view===n[0]?' aria-current="page"':'')+'>'+svg(n[2])+n[1]+'</button>';}).join('')+
     '</nav><div class="sidenote"><span style="color:var(--sidebar-ink)">Signed in as <b style="color:var(--sidebar-ink)">'+esc(u.name)+'</b><br>'+(u.role==='admin'?'Admin, all locations':esc(locName(u.location_id)))+'</span>'+pushWidget('sm')+'<button class="btn sm ghost" data-a="signout">Sign out</button></div></div></aside><main class="'+(S.busy?'busy':'')+'">';
   h+='<div class="top"><h1>'+TITLES[S.view]+'</h1><div class="who">';
@@ -862,7 +866,7 @@ function render(){
   h+='<button class="btn gold" data-a="new-booking">New booking</button></div></div>';
   if(!S.ref.locations){h+='<div class="empty">Loading...</div>';}
   else h+={today:vToday,jobs:vBoard,enq:vEnquiries,sched:vSchedule,reports:vReports,settings:vSettings}[S.view]();
-  h+='</main></div><nav class="tabbar" aria-label="Main">'+NAV.filter(function(n){return n[0]!=='settings';}).map(function(n){return '<button data-a="nav" data-v="'+n[0]+'"'+(S.view===n[0]?' aria-current="page"':'')+'>'+svg(n[2])+n[1]+'</button>';}).join('')+'</nav>';
+  h+='</main></div><nav class="tabbar" aria-label="Main">'+NAV.map(function(n){return '<button data-a="nav" data-v="'+n[0]+'"'+(S.view===n[0]?' aria-current="page"':'')+'>'+svg(n[2])+n[1]+'</button>';}).join('')+'</nav>';
   if(S.modal){
     var m=S.modal;
     if(m.type==='job'){var j=jobById(m.id);if(j)h+='<div class="overlay" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Job '+esc(j.job_no)+'" tabindex="-1" id="modal">'+vJob(j)+'</div></div>';}
