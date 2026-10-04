@@ -132,6 +132,11 @@ table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:9px 8px;border-top:1px solid var(--line);vertical-align:top}
 th{font-weight:600;color:var(--ink2);border-top:0;font-size:13px}
 .tablewrap{overflow-x:auto}
+table.qc td{vertical-align:middle}
+table.qc input[type=text]{min-height:36px;font-size:13.5px;padding:6px 8px}
+table.qc input[type=checkbox]{width:22px;height:22px;cursor:pointer}
+table.qc input:disabled{cursor:not-allowed;opacity:.65}
+table.qc th.qcchk,table.qc td.qcchk{text-align:center;width:88px}
 .overlay{position:fixed;inset:0;background:var(--scrim);display:flex;justify-content:flex-end;z-index:30}
 .overlay.center{justify-content:center;align-items:center;padding:16px}
 .sheet{background:var(--ground);width:min(1000px,100%);height:100%;overflow:auto;padding:20px 24px 30px}
@@ -236,6 +241,7 @@ var UPDATE_TPL=[
   {k:'delivered',l:'Delivered',fn:function(j){return 'Your keepsake has been delivered. We hope you love it. Thank you for choosing Lifeimpressions!';}}
 ];
 var UPDATE_DEFAULT={booked:'booked',casting_done:'casting',awaiting_photo:'photo',finishing:'finishing',layout_ready:'layout',awaiting_approval:'layout',final_fixing:'approved',quality_check:'approved',ready:'ready',delivered:'delivered'};
+var QC_ITEMS=[['casting_colour','Casting colour'],['frame_colour','Frame colour'],['glass_acrylic','Glass / Acrylic'],['photo','Photo / No photo'],['gold_badge','Gold badge'],['design','Front design / Back design'],['black_tape','Black tape finished'],['hook','Hook fixed'],['bubble_wrap','Bubble wrapped'],['mount','Mount fixed']];
 var REMIND_MSG='Dear customer, you have enquired about our service. Would you like to book right now? Visit our website https://www.lifeimpressions.in/book-online to book your desired service. Thanks.';
 var BUCKET='job-files';
 var ICON={
@@ -265,6 +271,8 @@ function istMidnightISO(offsetDays){
   return new Date(mid-5.5*3600*1000).toISOString();
 }
 function istHourNow(){return new Date(Date.now()+5.5*3600*1000).getUTCHours();}
+function qcCount(j){var c=j.qc_checks||{};return QC_ITEMS.filter(function(it){return c[it[0]]&&c[it[0]].ok;}).length;}
+function qcComplete(j){return qcCount(j)===QC_ITEMS.length;}
 function firstName(n){return String(n||'').trim().split(/[\s&]+/)[0]||'there';}
 function tplFor(k){return UPDATE_TPL.filter(function(t){return t.k===k;})[0]||UPDATE_TPL[0];}
 function waLink(phone,text){
@@ -425,7 +433,7 @@ async function loadAll(silent){
     S.jobs=r[9].filter(function(j){return !j.cancelled_at;}).map(function(j){
       var o=ord[j.order_id]||{},c=cust[o.customer_id]||{},v=vs[j.id]||{},s=svc[o.service_id]||{};
       return Object.assign({},j,{
-        customer:c.name||'Unknown',phone:c.whatsapp||'',service:s.name||'',hours:s.duration_hours,
+        customer:c.name||'Unknown',phone:c.whatsapp||'',service:s.name||'',hours:s.duration_hours,qcList:!!s.qc_checklist,
         frame:(fr[o.frame_size_id]||{}).name||'',addons:byOrder[j.order_id]||[],
         total:Number(o.price_incl_gst)||0,advance:Number(o.advance_paid)||0,sessionAt:o.session_at,
         loc:(loc[j.location_id]||{}).name||'',assignee:(stf[j.assigned_to]||{}).name||'Unassigned',
@@ -729,8 +737,8 @@ function vSettings(){
   var pushCard='<div class="panel"><h2>Daily reminders on this device</h2><p class="muted small" style="margin-bottom:10px">A short notification at 9am and 5pm summarising sessions and jobs needing attention, even when the tracker is closed. This is set up per device, so turn it on separately on your phone and your computer if you use both.</p>'+pushWidget('')+'</div>';
   var h='<div class="stack">'+pushCard+'<div class="panel"><h2>Staff</h2><div class="tablewrap"><table><thead><tr><th>Person</th><th>Role</th><th>Location</th><th>Phone</th></tr></thead><tbody>'+
     S.staff.map(function(s){return '<tr><td>'+esc(s.name)+'</td><td>'+(s.role==='admin'?'Admin':'Location staff')+'</td><td>'+esc(locName(s.location_id))+'</td><td>'+esc(s.phone||'')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
-  h+='<div class="panel"><h2>Services and prices (incl. 5% GST)</h2><div class="tablewrap"><table><thead><tr><th>Service</th><th>Duration</th><th>Price</th></tr></thead><tbody>'+
-    (R.services||[]).map(function(s){return '<tr><td>'+esc(s.name)+'</td><td>'+esc(s.duration_hours)+' hr</td><td>'+(s.is_from_price?'from ':'')+inr(s.price_incl_gst)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+  h+='<div class="panel"><h2>Services and prices (incl. 5% GST)</h2><div class="tablewrap"><table><thead><tr><th>Service</th><th>Duration</th><th>Price</th><th>QC checklist</th></tr></thead><tbody>'+
+    (R.services||[]).map(function(s){return '<tr><td>'+esc(s.name)+'</td><td>'+esc(s.duration_hours)+' hr</td><td>'+(s.is_from_price?'from ':'')+inr(s.price_incl_gst)+'</td><td>'+(s.qc_checklist?'Yes':'No')+'</td></tr>';}).join('')+'</tbody></table></div><p class="small muted" style="margin-top:10px">The checklist applies to baby services. To change this, tick or untick qc_checklist for a service in Supabase (Table Editor, services).</p></div>';
   h+='<div class="panel"><h2>Frame sizes and add-ons</h2><p class="muted small" style="margin-bottom:10px">Frame price is included in the service price.</p><div class="tablewrap"><table><tbody>'+
     (R.frames||[]).map(function(f){return '<tr><td>Frame: '+esc(f.name)+'</td><td class="muted">Included in service price</td></tr>';}).join('')+
     (R.addons||[]).map(function(a){return '<tr><td>Add-on: '+esc(a.name)+'</td><td>'+inr(a.price_incl_gst)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
@@ -756,8 +764,9 @@ function vJob(j){
      (j.photo_received_at?'<span class="chip ok">Received</span>':'<label class="btn sm ghost filebtn">Upload photo<input type="file" accept="image/*" data-upload="photo" data-id="'+j.id+'"></label>')+'</div>';
   h+='<div class="check"><div class="l"><b>Design layout</b><span class="muted small">'+appr+(j.layout_sent_at?' \u00B7 sent '+esc(fmtShort(j.layout_sent_at.slice(0,10))):'')+'</span></div>'+
      (j.approval==='approved'?'<span class="chip ok">Approved</span>':(j.approval==='changes'?'<span class="chip change">Changes</span>':(j.approval==='pending'?'<span class="chip wait">Waiting</span>':'')))+'</div>';
-  h+='<div class="check"><div class="l"><b>Quality check</b><span class="muted small">QC photo uploaded and approved by head office</span></div>'+(j.qc_approved?'<span class="chip ok">Approved</span>':'<span class="muted small">Not yet</span>')+'</div>';
+  h+='<div class="check"><div class="l"><b>Quality check</b><span class="muted small">'+(j.qcList?'All 10 checks ticked, QC photo uploaded, approved by head office':'QC photo uploaded and approved by head office')+'</span></div>'+(j.qc_approved?'<span class="chip ok">Approved</span>':'<span class="muted small">Not yet</span>')+'</div>';
   h+='</div>';
+  h+=vQcTable(j);
   var all=jobFiles(j);
   h+='<div class="panel"><div class="spread" style="margin-bottom:10px"><h2>Photos and files</h2><label class="btn sm ghost filebtn">Add progress photo<input type="file" accept="image/*" data-upload="progress" data-id="'+j.id+'"></label></div>';
   if(!all.length)h+='<div class="empty">No files yet.</div>';
@@ -779,6 +788,27 @@ function vJob(j){
   h+='</div><div>'+phone(j)+'</div></div>';
   return h;
 }
+function vQcTable(j){
+  if(!j.qcList||stageIdx(j)<STAGE_KEYS.indexOf('quality_check'))return '';
+  var edit=(j.stage==='quality_check'&&!j.qc_approved),c=j.qc_checks||{},n=qcCount(j);
+  var chip=j.qc_approved?'<span class="chip ok">QC Passed</span>':'<span class="chip '+(n===QC_ITEMS.length?'ok':'wait')+'">'+n+' of '+QC_ITEMS.length+' passed</span>';
+  var h='<div class="panel"><div class="spread" style="margin-bottom:6px"><h2>Customer requirement checklist</h2>'+chip+'</div>'+
+    '<p class="muted small" style="margin-bottom:10px">'+(edit?'Tick each point once it matches what the customer asked for, including when they asked for none. All '+QC_ITEMS.length+' must pass before QC can be approved.':(j.qc_approved?'QC is approved, so this checklist is locked.':'Read only.'))+'</p>'+
+    '<div class="tablewrap"><table class="qc"><thead><tr><th>Description</th><th>Customer requirement</th><th class="qcchk">QC Passed</th></tr></thead><tbody>';
+  QC_ITEMS.forEach(function(it,i){
+    var k=it[0],row=c[k]||{};
+    h+='<tr><td>'+(i+1)+'. '+esc(it[1])+'</td>'+
+      '<td><input type="text" id="qcn-'+k+'" data-change="qc-note" data-id="'+j.id+'" data-key="'+k+'" value="'+esc(row.note||'')+'" aria-label="Customer requirement for '+esc(it[1])+'" placeholder="Optional"'+(edit?'':' disabled')+'></td>'+
+      '<td class="qcchk"><input type="checkbox" id="qc-'+k+'" data-change="qc-check" data-id="'+j.id+'" data-key="'+k+'"'+(row.ok?' checked':'')+' aria-label="QC passed: '+esc(it[1])+'"'+(edit?'':' disabled')+'></td></tr>';
+  });
+  return h+'</tbody></table></div></div>';
+}
+async function saveQc(j,checks,doRender){
+  var old=j.qc_checks;j.qc_checks=checks;
+  if(doRender)render();
+  var r=await sb.from('jobs').update({qc_checks:checks}).eq('id',j.id);
+  if(r.error){j.qc_checks=old;render();fail(r.error);}
+}
 function stageControls(j){
   var lbl=actionLabel(j),h='',up=function(kind,text){return '<label class="btn sm ghost filebtn">'+text+'<input type="file" accept="image/*" data-upload="'+kind+'" data-id="'+j.id+'"></label>';};
   var lay=jobFiles(j,'layout').length,qc=jobFiles(j,'qc').length;
@@ -788,8 +818,10 @@ function stageControls(j){
   if(j.stage==='quality_check'){
     h+=up('qc',qc?'Upload another QC photo':'Upload QC photo');
     if(!j.qc_approved){
-      if(isAdmin())h+='<button class="btn ghost" data-a="approve-qc" data-id="'+j.id+'"'+(qc?'':' disabled')+'>Approve QC</button>';
+      var qcReady=qc&&(!j.qcList||qcComplete(j));
+      if(isAdmin())h+='<button class="btn ghost" data-a="approve-qc" data-id="'+j.id+'"'+(qcReady?'':' disabled')+'>Approve QC</button>';
       else h+='<span class="muted small">Head office approves QC.</span>';
+      if(j.qcList&&!qcComplete(j))h+='<span class="muted small">'+qcCount(j)+' of '+QC_ITEMS.length+' checks done.</span>';
     }
   }
   h+='<button class="btn ghost" data-a="open-update" data-id="'+j.id+'">Send update</button>';
@@ -1061,6 +1093,16 @@ document.addEventListener('change',async function(ev){
   if(el){
     var k=el.getAttribute('data-change'),id=el.getAttribute('data-id');
     if(k==='loc'){S.locFilter=el.value;render();}
+    else if(k==='qc-check'){
+      var jq=jobById(id),qk=el.getAttribute('data-key'),cq=Object.assign({},jq.qc_checks||{});
+      cq[qk]=Object.assign({},cq[qk]||{},{ok:el.checked});
+      await saveQc(jq,cq,true);
+    }
+    else if(k==='qc-note'){
+      var jn=jobById(id),nk=el.getAttribute('data-key'),cn=Object.assign({},jn.qc_checks||{});
+      cn[nk]=Object.assign({},cn[nk]||{},{note:el.value.trim()});
+      await saveQc(jn,cn,false);
+    }
     else if(k==='upd-tpl'){var jt=jobById(id);$('up-text').value=tplFor(el.value).fn(jt);}
     else if(k==='assign'){await upd(id,{assigned_to:el.value});await refreshAfter('Assignee updated.');}
     else if(k==='enq-status'){
