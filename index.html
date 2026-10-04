@@ -225,6 +225,17 @@ var ENQ_LABEL={new:'New',contacted:'Contacted',quoted:'Quoted',booked:'Booked',l
 var SRC_KEYS=['instagram','whatsapp','website','referral','walk_in','call','other'];
 var SRC_LABEL={instagram:'Instagram',whatsapp:'WhatsApp',website:'Website',referral:'Referral',walk_in:'Walk-in',call:'Call',other:'Other'};
 var LOST_REASONS=['Price','Date not available','Chose a competitor','No reply','Other'];
+var UPDATE_TPL=[
+  {k:'booked',l:'Booked',fn:function(j){return 'Hi '+firstName(j.customer)+', your '+j.service+' at Lifeimpressions '+j.loc+' is booked for '+fmt(j.casting_date)+', '+fmtTime(j.sessionAt)+". You can send us the photo you'd like on your keepsake here anytime.";}},
+  {k:'casting',l:'Casting done',fn:function(j){return 'Thank you, '+firstName(j.customer)+"! Your casting is done. Your keepsake will be ready in about 2 weeks and we'll update you here.";}},
+  {k:'photo',l:'Photo request',fn:function(j){return 'Hi '+firstName(j.customer)+", please send the photo you'd like used on your keepsake so we can design your layout.";}},
+  {k:'finishing',l:'Finishing',fn:function(j){return 'Hi '+firstName(j.customer)+', your cast is being cured and finished. Next, we will send you the layout to approve.';}},
+  {k:'layout',l:'Layout sent',fn:function(j){return "Here's the layout for your keepsake. Please reply APPROVE, or tell us what to change.";}},
+  {k:'approved',l:'Design approved',fn:function(j){return "Thank you! Your design is approved and we're now assembling your keepsake.";}},
+  {k:'ready',l:'Ready',fn:function(j){return 'Good news, '+firstName(j.customer)+'! Your keepsake is ready. Expected by '+fmt(j.promised_delivery)+'.';}},
+  {k:'delivered',l:'Delivered',fn:function(j){return 'Your keepsake has been delivered. We hope you love it. Thank you for choosing Lifeimpressions!';}}
+];
+var UPDATE_DEFAULT={booked:'booked',casting_done:'casting',awaiting_photo:'photo',finishing:'finishing',layout_ready:'layout',awaiting_approval:'layout',final_fixing:'approved',quality_check:'approved',ready:'ready',delivered:'delivered'};
 var REMIND_MSG='Dear customer, you have enquired about our service. Would you like to book right now? Visit our website https://www.lifeimpressions.in/book-online to book your desired service. Thanks.';
 var BUCKET='job-files';
 var ICON={
@@ -254,6 +265,8 @@ function istMidnightISO(offsetDays){
   return new Date(mid-5.5*3600*1000).toISOString();
 }
 function istHourNow(){return new Date(Date.now()+5.5*3600*1000).getUTCHours();}
+function firstName(n){return String(n||'').trim().split(/[\s&]+/)[0]||'there';}
+function tplFor(k){return UPDATE_TPL.filter(function(t){return t.k===k;})[0]||UPDATE_TPL[0];}
 function waLink(phone,text){
   var d=String(phone||'').replace(/\D/g,'');
   if(!d)return null;
@@ -750,6 +763,7 @@ function vJob(j){
   if(!all.length)h+='<div class="empty">No files yet.</div>';
   else{h+='<div class="thumbs">'+all.map(function(f){var u=S.urls[f.storage_path];return '<figure>'+(u?'<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="'+esc(f.kind)+' photo"></a>':'<img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">')+'<figcaption>'+esc(f.kind)+'</figcaption></figure>';}).join('')+'</div>';}
   h+='</div>';
+  h+='<div class="panel"><h2>Notes and updates sent</h2>'+(j.notes?'<div style="white-space:pre-wrap;font-size:14px">'+esc(j.notes)+'</div>':'<div class="empty">Nothing logged yet.</div>')+'</div>';
   var staffOpts=S.staff.filter(function(s){return s.active&&(s.location_id===j.location_id||s.role==='admin');});
   h+='<div class="panel"><h2>Details</h2><dl class="facts">'+
     '<div><dt>Assigned to</dt><dd><label class="sr" for="asg">Assigned to</label><select id="asg" data-change="assign" data-id="'+j.id+'">'+staffOpts.map(function(s){return '<option value="'+s.id+'"'+(s.id===j.assigned_to?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select></dd></div>'+
@@ -778,6 +792,7 @@ function stageControls(j){
       else h+='<span class="muted small">Head office approves QC.</span>';
     }
   }
+  h+='<button class="btn ghost" data-a="open-update" data-id="'+j.id+'">Send update</button>';
   if(lbl){
     var dis=false;
     if(j.stage==='layout_ready'&&!lay)dis=true;
@@ -788,7 +803,7 @@ function stageControls(j){
   }
   h+='</div>';
   if(j.stage==='finishing'&&!j.photo_received_at)h+='<div class="rule" style="margin-top:12px">The layout cannot be designed without the customer photo. It has not arrived yet.</div>';
-  if(j.stage==='awaiting_approval'&&j.approval==='pending')h+='<p class="small muted" style="margin-top:10px">Final fixing stays locked until the customer taps Approve on WhatsApp.</p>';
+  if(j.stage==='awaiting_approval'&&j.approval==='pending')h+='<p class="small muted" style="margin-top:10px">Final fixing stays locked until the customer approves. Head office marks it approved once they reply.</p>';
   if(j.stage==='booked'&&j.day_no<0)h+='<p class="small muted" style="margin-top:10px">Casting can be marked done from '+esc(fmt(j.casting_date))+'.</p>';
   return h;
 }
@@ -802,7 +817,7 @@ function phone(j){
     h+='<div class="b'+(m.direction==='in'?' in':'')+'">'+esc(m.body||('['+(m.template||'message')+']'))+'<small>'+esc(fmtTime(m.created_at))+(m.status?' \u00B7 '+esc(m.status):'')+'</small></div>';
   });
   h+='</div><div class="phonefoot"><button class="btn sm ghost" data-a="reload-msgs" data-id="'+j.id+'">Refresh messages</button></div></div>';
-  h+='<p class="demo">This is the real message history for this job. Messages appear here once WhatsApp is connected.</p>';
+  h+='<p class="demo">Updates sent with Send update are listed under Notes and updates sent. This history fills in by itself once the WhatsApp API is connected.</p>';
   return h;
 }
 
@@ -861,6 +876,15 @@ function vApprove(j){
    '<label class="f">How did the customer confirm? (kept in the job notes)<textarea id="ap-note" placeholder="e.g. Confirmed by phone call today"></textarea></label>'+
    '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn gold" data-a="confirm-approve" data-id="'+j.id+'">Mark approved</button></div>';
 }
+function vUpdate(j){
+  var key=UPDATE_DEFAULT[j.stage]||'booked',has=!!String(j.phone||'').replace(/\D/g,'');
+  return '<h2 id="dlgt">Send update to '+esc(j.customer)+'</h2><p class="muted small" style="margin:4px 0 16px">This opens WhatsApp with the message below, ready to send to '+(has?esc(j.phone):'their number')+'. You can edit it first.</p>'+
+   (has?'':'<div class="rule" style="margin-bottom:12px">No WhatsApp number is on file for this customer.</div>')+
+   '<label class="f">Message type<select id="up-key" data-change="upd-tpl" data-id="'+j.id+'">'+UPDATE_TPL.map(function(t){return '<option value="'+t.k+'"'+(t.k===key?' selected':'')+'>'+esc(t.l)+'</option>';}).join('')+'</select></label>'+
+   '<label class="f" style="margin-top:12px">Message<textarea id="up-text" rows="5">'+esc(tplFor(key).fn(j))+'</textarea></label>'+
+   '<p class="small muted" style="margin-top:8px">WhatsApp links cannot attach pictures. For the layout, attach the image in WhatsApp before you send.</p>'+
+   '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="back-job" data-id="'+j.id+'">Cancel</button><button class="btn gold" data-a="send-update" data-id="'+j.id+'"'+(has?'':' disabled')+'>Open WhatsApp</button></div>';
+}
 function vRemind(x){
   var has=!!String(x.whatsapp||'').trim();
   return '<h2 id="dlgt">Remind '+esc(x.name)+'?</h2><p class="muted small" style="margin:4px 0 16px">This opens WhatsApp with the message below, ready to send to '+(has?esc(x.whatsapp):'their number')+'. You can edit it first.</p>'+
@@ -891,7 +915,7 @@ function render(){
   if(S.modal){
     var m=S.modal;
     if(m.type==='job'){var j=jobById(m.id);if(j)h+='<div class="overlay" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Job '+esc(j.job_no)+'" tabindex="-1" id="modal">'+vJob(j)+'</div></div>';}
-    else{var body=m.type==='booking'?vBooking(m.pre):(m.type==='enq'?vEnqForm():(m.type==='cancel'?vCancel(jobById(m.id)):(m.type==='approve'?vApprove(jobById(m.id)):(m.type==='remind'?vRemind(enqById(m.id)):vLost(enqById(m.id))))));h+='<div class="overlay center" data-a="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgt" tabindex="-1" id="modal">'+body+'</div></div>';}
+    else{var body=m.type==='booking'?vBooking(m.pre):(m.type==='enq'?vEnqForm():(m.type==='cancel'?vCancel(jobById(m.id)):(m.type==='approve'?vApprove(jobById(m.id)):(m.type==='remind'?vRemind(enqById(m.id)):(m.type==='update'?vUpdate(jobById(m.id)):vLost(enqById(m.id)))))));h+='<div class="overlay center" data-a="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgt" tabindex="-1" id="modal">'+body+'</div></div>';}
   }
   var me=$('msgs'),keep=me?me.scrollTop:0,atEnd=me?(me.scrollHeight-me.scrollTop-me.clientHeight<40):true;
   var sheet=document.querySelector('.sheet'),sk=sheet?sheet.scrollTop:0;
@@ -956,6 +980,19 @@ document.addEventListener('click',async function(ev){
     case 'new-enq':openModal({type:'enq'});break;
     case 'cancel-booking':openModal({type:'cancel',id:id});break;
     case 'open-remind':openModal({type:'remind',id:id});break;
+    case 'open-update':openModal({type:'update',id:id});break;
+    case 'back-job':openModal({type:'job',id:id});break;
+    case 'send-update':{
+      var ju=jobById(id),utxt=$('up-text').value.trim(),ukey=$('up-key').value;
+      if(!utxt){toast('Write a message first.',true);return;}
+      var ulink=waLink(ju.phone,utxt);
+      if(!ulink){toast('No WhatsApp number on file for this customer.',true);return;}
+      window.open(ulink,'_blank');
+      var ustamp=new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+      var uline='['+ustamp+'] Update sent by '+S.me.name+': '+tplFor(ukey).l;
+      var ur=await sb.from('jobs').update({notes:(ju.notes?ju.notes+'\n':'')+uline}).eq('id',id);
+      if(ur.error)throw ur.error;
+      S.modal={type:'job',id:id};await refreshAfter('WhatsApp opened for '+ju.customer+'. Tap send there.');break;}
     case 'mark-approved':openModal({type:'approve',id:id});break;
     case 'send-remind':{
       var ex=enqById(id),msg=$('rm-text').value.trim();
@@ -1024,6 +1061,7 @@ document.addEventListener('change',async function(ev){
   if(el){
     var k=el.getAttribute('data-change'),id=el.getAttribute('data-id');
     if(k==='loc'){S.locFilter=el.value;render();}
+    else if(k==='upd-tpl'){var jt=jobById(id);$('up-text').value=tplFor(el.value).fn(jt);}
     else if(k==='assign'){await upd(id,{assigned_to:el.value});await refreshAfter('Assignee updated.');}
     else if(k==='enq-status'){
       var x=enqById(id),v=el.value;
