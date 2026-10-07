@@ -69,7 +69,7 @@ main{padding:22px 28px 60px;min-width:0}
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;margin-bottom:22px}
 .top .who{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .field-inline{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2)}
-select,input[type=text],input[type=email],input[type=password],input[type=tel],input[type=date],input[type=number],textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:44px;width:100%}
+select,input[type=text],input[type=email],input[type=password],input[type=tel],input[type=date],input[type=time],input[type=number],textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:44px;width:100%}
 .field-inline select{width:auto}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--ink2)}
 label.f span.h{font-weight:400}
@@ -242,6 +242,9 @@ var UPDATE_TPL=[
 ];
 var UPDATE_DEFAULT={booked:'booked',casting_done:'casting',awaiting_photo:'photo',finishing:'finishing',layout_ready:'layout',awaiting_approval:'layout',final_fixing:'approved',quality_check:'approved',ready:'ready',delivered:'delivered'};
 var QC_ITEMS=[['casting_colour','Casting colour'],['frame_colour','Frame colour'],['glass_acrylic','Glass / Acrylic'],['photo','Photo / No photo'],['gold_badge','Gold badge'],['design','Front design / Back design'],['black_tape','Black tape finished'],['hook','Hook fixed'],['bubble_wrap','Bubble wrapped'],['mount','Mount fixed']];
+var SHEET_SEARCH=[['google','Google'],['facebook','Facebook'],['instagram','Instagram'],['referral','Friends referral'],['other','Other']];
+var SHEET_DELIVERY=[['urgent','Urgent (extra charges apply)',null],['2w','2 weeks',14],['3w','3 weeks',21],['4w','4 weeks',28]];
+var SHEET_PAY=['Cash','UPI','Card','Online','Bank transfer','Pending'];
 var REMIND_MSG='Dear customer, you have enquired about our service. Would you like to book right now? Visit our website https://www.lifeimpressions.in/book-online to book your desired service. Thanks.';
 var BUCKET='job-files';
 var ICON={
@@ -271,6 +274,36 @@ function istMidnightISO(offsetDays){
   return new Date(mid-5.5*3600*1000).toISOString();
 }
 function istHourNow(){return new Date(Date.now()+5.5*3600*1000).getUTCHours();}
+function sheetOf(j){return j.job_sheet||{};}
+function custCost(j){return parseFloat(sheetOf(j).customization_cost)||0;}
+function totalCharges(j){return j.total+custCost(j)+(j.travel||0);}
+function dueNow(j){return Math.max(0,totalCharges(j)-j.advance);}
+function chargesHtml(j){
+  var c=custCost(j),t=j.travel||0;
+  function row(l,v,strong,idv){return '<div class="spread" style="padding:3px 0'+(strong?';font-weight:700;border-top:1px solid var(--line);margin-top:4px;padding-top:6px':'')+'"><span'+(strong?'':' class="muted"')+'>'+l+'</span><span'+(idv?' id="'+idv+'"':'')+'>'+v+'</span></div>';}
+  return row('Service total (incl. 5% GST)',inr(j.total))+
+    (c>0?row('Customization cost',inr(c)):'')+
+    (t>0?row('Travel charges',inr(t)):'')+
+    row('Total charges',inr(totalCharges(j)),true)+
+    row('Advance paid','\u2212'+inr(j.advance))+
+    row('Balance due',inr(dueNow(j)),true,'dt-balance');
+}
+function sheetAnswered(j){var sh=sheetOf(j);return Object.keys(sh).some(function(k){return sh[k]!==''&&sh[k]!==false&&sh[k]!=null;});}
+function sheetChip(j){var sh=sheetOf(j);return sh.agreed?{c:'ok',t:'Agreed'}:(sheetAnswered(j)?{c:'wait',t:'In progress'}:{c:'',t:'Not filled'});}
+function updateSheetLive(j){
+  var ch=$('sh-chip'),st=sheetChip(j);if(ch){ch.className='chip '+st.c;ch.textContent=st.t;}
+  var b1=$('sh-balance'),ch=$('dt-charges');if(b1)b1.textContent=inr(dueNow(j));if(ch)ch.innerHTML=chargesHtml(j);
+}
+async function saveSheet(j,patch){
+  var old=j.job_sheet||{},next=Object.assign({},old,patch),oldProm=j.promised_delivery;
+  j.job_sheet=next;j.promised_delivery=next.delivery_date||j.promised_db;
+  updateSheetLive(j);
+  var r=await sb.from('jobs').update({job_sheet:next}).eq('id',j.id);
+  if(r.error){
+    j.job_sheet=old;j.promised_delivery=oldProm;render();
+    fail(/job_sheet/.test(r.error.message||'')?{message:'Run 09_job_sheet.sql in Supabase first, then try again.'}:r.error);
+  }
+}
 function qcCount(j){var c=j.qc_checks||{};return QC_ITEMS.filter(function(it){return c[it[0]]&&c[it[0]].ok;}).length;}
 function qcComplete(j){return qcCount(j)===QC_ITEMS.length;}
 function firstName(n){return String(n||'').trim().split(/[\s&]+/)[0]||'there';}
@@ -433,9 +466,9 @@ async function loadAll(silent){
     S.jobs=r[9].filter(function(j){return !j.cancelled_at;}).map(function(j){
       var o=ord[j.order_id]||{},c=cust[o.customer_id]||{},v=vs[j.id]||{},s=svc[o.service_id]||{};
       return Object.assign({},j,{
-        customer:c.name||'Unknown',phone:c.whatsapp||'',service:s.name||'',hours:s.duration_hours,qcList:!!s.qc_checklist,
+        customer:c.name||'Unknown',phone:c.whatsapp||'',customerId:c.id,email:c.email||'',address:c.address||'',sessionAddress:o.session_address||'',promised_db:j.promised_delivery,promised_delivery:((j.job_sheet||{}).delivery_date||j.promised_delivery),service:s.name||'',hours:s.duration_hours,qcList:!!s.qc_checklist,
         frame:(fr[o.frame_size_id]||{}).name||'',addons:byOrder[j.order_id]||[],
-        total:Number(o.price_incl_gst)||0,advance:Number(o.advance_paid)||0,sessionAt:o.session_at,
+        total:Number(o.price_incl_gst)||0,advance:Number(o.advance_paid)||0,travel:Number(o.travel_charges)||0,sessionAt:o.session_at,
         loc:(loc[j.location_id]||{}).name||'',assignee:(stf[j.assigned_to]||{}).name||'Unassigned',
         day_no:v.day_no==null?0:Number(v.day_no),overdue:!!v.overdue,photo_missing:!!v.photo_missing,call_photo:!!v.call_photo,
         call_approval:!!v.call_approval,changes_requested:!!v.changes_requested,waiting_on_customer:!!v.waiting_on_customer,
@@ -758,6 +791,7 @@ function vJob(j){
   if(fl.length)h+='<div class="row" style="margin-top:8px">'+fl.map(chip).join('')+'</div>';
   h+=stageControls(j);
   h+='</div>';
+  h+=vJobSheet(j);
   var appr={none:'Not sent yet',pending:'Sent, waiting for reply',approved:'Approved by customer',changes:'Customer asked for changes'}[j.approval];
   h+='<div class="panel"><h2>Checklist</h2>';
   h+='<div class="check"><div class="l"><b>Customer photo</b><span class="muted small">'+(j.photo_received_at?'Received '+esc(fmtShort(j.photo_received_at.slice(0,10))):'Not received')+'</span></div>'+
@@ -773,20 +807,91 @@ function vJob(j){
   else{h+='<div class="thumbs">'+all.map(function(f){var u=S.urls[f.storage_path];return '<figure>'+(u?'<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="'+esc(f.kind)+' photo"></a>':'<img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">')+'<figcaption>'+esc(f.kind)+'</figcaption></figure>';}).join('')+'</div>';}
   h+='</div>';
   h+='<div class="panel"><h2>Notes and updates sent</h2>'+(j.notes?'<div style="white-space:pre-wrap;font-size:14px">'+esc(j.notes)+'</div>':'<div class="empty">Nothing logged yet.</div>')+'</div>';
+  h+=vCustomer(j);
   var staffOpts=S.staff.filter(function(s){return s.active&&(s.location_id===j.location_id||s.role==='admin');});
   h+='<div class="panel"><h2>Details</h2><dl class="facts">'+
     '<div><dt>Assigned to</dt><dd><label class="sr" for="asg">Assigned to</label><select id="asg" data-change="assign" data-id="'+j.id+'">'+staffOpts.map(function(s){return '<option value="'+s.id+'"'+(s.id===j.assigned_to?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select></dd></div>'+
     '<div><dt>Location</dt><dd>'+esc(j.loc)+'</dd></div>'+
     '<div><dt>Casting session</dt><dd>'+esc(fmt(j.casting_date))+', '+esc(fmtTime(j.sessionAt))+'</dd></div>'+
     '<div><dt>Delivery by</dt><dd>'+esc(fmt(j.promised_delivery))+(j.wait_days?'<br><span class="chip wait">+'+j.wait_days+' days: customer delay</span>':'')+'</dd></div>'+
-    '<div><dt>Total (incl. 5% GST)</dt><dd>'+inr(j.total)+'</dd></div>'+
-    '<div><dt>Balance due</dt><dd>'+inr(Math.max(0,j.total-j.advance))+'</dd></div>'+
+    '<div style="grid-column:1/-1"><dt>Charges</dt><dd id="dt-charges" style="font-weight:400">'+chargesHtml(j)+'</dd></div>'+
     '<div><dt>Advance paid (\u20B9)</dt><dd class="row"><label class="sr" for="adv">Advance paid</label><input type="number" id="adv" min="0" value="'+esc(j.advance)+'" style="min-height:36px;width:110px"><button class="btn sm ghost" data-a="save-advance" data-id="'+j.id+'">Save</button></dd></div>'+
-    '<div><dt>WhatsApp</dt><dd>'+esc(j.phone)+'</dd></div>'+
+    '<div><dt>Travel charges (\u20B9)</dt><dd class="row"><label class="sr" for="trv">Travel charges</label><input type="number" id="trv" min="0" step="1" value="'+esc(j.travel||0)+'" style="min-height:36px;width:110px"><button class="btn sm ghost" data-a="save-travel" data-id="'+j.id+'">Save</button></dd><span class="small muted">Doorstep Ola/Uber fare. Added to the balance.</span></div>'+
     '<div><dt>GST invoice no.</dt><dd class="row"><label class="sr" for="inv">GST invoice number</label><input type="text" id="inv" value="'+esc(j.invoice_no||'')+'" style="min-height:36px;width:130px"><button class="btn sm ghost" data-a="save-invoice" data-id="'+j.id+'">Save</button></dd></div></dl>'+
     (j.stage!=='delivered'?'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><button class="btn sm ghost" data-a="cancel-booking" data-id="'+j.id+'" style="color:var(--rose)">Cancel booking</button></div>':'')+'</div>';
   h+='</div><div>'+phone(j)+'</div></div>';
   return h;
+}
+function shText(j,k,label,hint,type,extra){
+  var v=sheetOf(j)[k];v=v==null?'':v;
+  return '<label class="f">'+esc(label)+(hint?'<span class="h">'+esc(hint)+'</span>':'')+'<input type="'+(type||'text')+'" id="sh-'+k+'" data-change="sh-field" data-id="'+j.id+'" data-key="'+k+'" value="'+esc(v)+'" autocomplete="off"'+(extra||'')+'></label>';
+}
+function shSelect(j,k,label,opts,hint,blank){
+  var v=sheetOf(j)[k]||'';
+  return '<label class="f">'+esc(label)+(hint?'<span class="h">'+esc(hint)+'</span>':'')+'<select id="sh-'+k+'" data-change="sh-field" data-id="'+j.id+'" data-key="'+k+'"><option value="">'+esc(blank||'Select')+'</option>'+
+    opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]===v?' selected':'')+'>'+esc(o[1])+'</option>';}).join('')+'</select></label>';
+}
+function shCheck(j,k,text){
+  return '<label class="full row" style="gap:10px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="sh-'+k+'" data-change="sh-field" data-id="'+j.id+'" data-key="'+k+'"'+(sheetOf(j)[k]?' checked':'')+' style="width:20px;height:20px;margin-top:2px;flex:none"><span style="flex:1">'+esc(text)+'</span></label>';
+}
+function vJobSheet(j){
+  var st=sheetChip(j),sh=sheetOf(j),h3=function(t){return '<h3 class="full" style="margin-top:10px">'+esc(t)+'</h3>';};
+  return '<div class="panel" id="jobsheet"><div class="spread" style="margin-bottom:6px"><h2>Job sheet</h2><span class="chip '+st.c+'" id="sh-chip">'+st.t+'</span></div>'+
+    '<p class="muted small" style="margin-bottom:12px">The digital version of the paper job sheet. Answers save as you go. The customer still signs the paper copy.</p>'+
+    '<dl class="facts" style="margin-bottom:16px">'+
+      '<div><dt>Job ID</dt><dd>'+esc(j.job_no)+'</dd></div>'+
+      '<div><dt>Date and Place</dt><dd>'+esc(fmtShort(String(j.created_at||'').slice(0,10)))+', '+esc(j.loc)+'</dd></div>'+
+      '<div><dt>Mobile number</dt><dd>'+esc(j.phone)+'</dd></div>'+
+      '<div><dt>Customer Name</dt><dd>'+esc(j.customer)+'</dd></div>'+
+      '<div><dt>Casting Service</dt><dd>'+esc(j.service)+'</dd></div>'+
+      '<div><dt>Casting Date</dt><dd>'+esc(fmt(j.casting_date))+'</dd></div>'+
+    '</dl>'+
+    '<div class="form">'+
+      shText(j,'booking','Booking')+
+      h3('Baby details')+
+      shText(j,'baby_name','Baby Name')+
+      '<span></span>'+
+      shText(j,'dob','D.O.B','Date of birth','date')+
+      shText(j,'tob','T.O.B','Time of birth','time')+
+      shText(j,'height','Height','e.g. 52 cm')+
+      shText(j,'weight','Weight','e.g. 3.4 kg')+
+      h3('Casting and frame')+
+      shText(j,'casting_color','Casting Color')+
+      shText(j,'frame_pattern','Frame pattern and Color')+
+      shSelect(j,'frame_layout','Frame layout front or background',[['front','Front'],['background','Background']])+
+      shText(j,'frame_size','Frame Size')+
+      h3('Extras')+
+      shSelect(j,'display_box','Display Box',[['couple','Couple casting'],['parent_baby','Parent with Baby']],'Couple casting / Parent with Baby','None')+
+      shSelect(j,'ring_highlight','Ring highlight',[['yes','Yes'],['no','No']],'Y/N')+
+      shText(j,'ring_color','Ring colour','If yes')+
+      shText(j,'wooden_base','Wooden Base')+
+      shText(j,'photo','Photo')+
+      shText(j,'tagline','Tagline')+
+      shText(j,'customization_cost','Customization Cost','\u20B9, added to the balance','number',' min="0" step="1" inputmode="numeric"')+
+      h3('Payment and delivery')+
+      '<label class="f">Payment<input type="text" list="sh-pay-list" id="sh-payment" data-change="sh-field" data-id="'+j.id+'" data-key="payment" value="'+esc(sh.payment||'')+'" autocomplete="off"><datalist id="sh-pay-list">'+SHEET_PAY.map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist></label>'+
+      '<span></span>'+
+      '<div><span class="small muted" style="font-weight:600">Advance</span><div style="font-weight:600;margin-top:4px">'+inr(j.advance)+'</div></div>'+
+      '<div><span class="small muted" style="font-weight:600">Balance</span><div style="font-weight:600;margin-top:4px" id="sh-balance">'+inr(dueNow(j))+'</div><span class="small muted">Includes the customization cost and travel charges</span></div>'+
+      shSelect(j,'search','Search',SHEET_SEARCH,'How did they find us?')+
+      shSelect(j,'delivery','Delivery',SHEET_DELIVERY.map(function(o){return [o[0],o[1]];}),'Urgent, 2w, 3w, 4w')+
+      shText(j,'delivery_date','Delivery date','Used as the promised delivery date','date')+
+      '<span></span>'+
+      '<label class="f full">Comments<textarea id="sh-comments" data-change="sh-field" data-id="'+j.id+'" data-key="comments" rows="3">'+esc(sh.comments||'')+'</textarea></label>'+
+      h3('Agreement')+
+      shCheck(j,'agreed','The customer agrees to the Terms and Conditions and confirms the details above are true.')+
+      shCheck(j,'promo_ok','The customer allows Lifeimpressions to use their email for further email promotions.')+
+    '</div></div>';
+}
+function vCustomer(j){
+  return '<div class="panel"><h2>Customer</h2><dl class="facts" style="margin-top:10px">'+
+    '<div><dt>Name</dt><dd>'+esc(j.customer)+'</dd></div>'+
+    '<div><dt>WhatsApp</dt><dd>'+esc(j.phone)+'</dd></div>'+
+    '<div style="grid-column:1/-1"><dt><label for="ct-email">Email</label></dt><dd><input type="email" id="ct-email" value="'+esc(j.email)+'" placeholder="Not provided" autocomplete="off"></dd></div>'+
+    '<div style="grid-column:1/-1"><dt><label for="ct-addr">Address</label></dt><dd><input type="text" id="ct-addr" value="'+esc(j.address)+'" placeholder="Not provided" autocomplete="off"></dd></div>'+
+    (j.sessionAddress?'<div style="grid-column:1/-1"><dt>Booking address (from the website)</dt><dd style="font-weight:400">'+esc(j.sessionAddress)+'</dd></div>':'')+
+    '</dl><div class="row" style="margin-top:12px"><button class="btn sm" data-a="save-contact" data-id="'+j.id+'">Save contact details</button></div>'+
+    '<p class="small muted" style="margin-top:8px">Saved on the customer, so it shows on all their bookings.</p></div>';
 }
 function vQcTable(j){
   if(!j.qcList||stageIdx(j)<STAGE_KEYS.indexOf('quality_check'))return '';
@@ -864,6 +969,8 @@ function vBooking(pre){
    '<label class="f full">Customer name<input type="text" id="b-name" value="'+esc(pre.name||'')+'" autocomplete="off"></label>'+
    '<label class="f">WhatsApp number<input type="tel" id="b-phone" value="'+esc(pre.phone||'')+'" placeholder="+91"></label>'+
    '<label class="f">Location'+locSel+'</label>'+
+   '<label class="f">Email (optional)<input type="email" id="b-email" value="'+esc(pre.email||'')+'" autocomplete="off"></label>'+
+   '<label class="f">Address (optional)<input type="text" id="b-addr" value="'+esc(pre.address||'')+'" autocomplete="off"></label>'+
    '<label class="f full">Service<select id="b-svc">'+(R.services||[]).filter(function(s){return s.active;}).map(function(s){return '<option value="'+s.id+'"'+(s.id===pre.service_id?' selected':'')+'>'+esc(s.name)+' ('+(s.is_from_price?'from ':'')+inr(s.price_incl_gst)+')</option>';}).join('')+'</select></label>'+
    '<label class="f">Frame size<select id="b-frame">'+opt((R.frames||[]).map(function(f){return {v:f.id,l:f.name};}),(R.frames[0]||{}).id)+'</select><span class="h">Included in the service price</span></label>'+
    '<label class="f">Advance paid (\u20B9)<input type="number" id="b-adv" min="0" value="" placeholder="0"></label>'+
@@ -872,7 +979,7 @@ function vBooking(pre){
    '<div class="full"><span class="small muted" style="font-weight:600">Add-ons</span><div class="addons">'+(R.addons||[]).filter(function(a){return a.active;}).map(function(a){return '<label><input type="checkbox" class="b-ad" value="'+a.id+'"> '+esc(a.name)+' ('+inr(a.price_incl_gst)+')</label>';}).join('')+'</div></div>'+
    '<label class="full row" style="gap:10px"><input type="checkbox" id="b-consent" style="width:20px;height:20px"> The customer agreed to receive WhatsApp updates</label>'+
    '<div class="full summary" id="b-sum"></div></div>'+
-   '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn gold" data-a="save-booking" data-enq="'+esc(pre.enqId||'')+'" data-inbox="'+esc(pre.inboxId||'')+'" data-wix="'+esc(pre.wixId||'')+'">Create booking</button></div>';
+   '<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-a="close">Cancel</button><button class="btn gold" data-a="save-booking" data-enq="'+esc(pre.enqId||'')+'" data-inbox="'+esc(pre.inboxId||'')+'" data-wix="'+esc(pre.wixId||'')+'" data-sess="'+esc(pre.sess||'')+'">Create booking</button></div>';
 }
 function bookingTotals(){
   var s=(S.ref.services||[]).filter(function(x){return String(x.id)===$('b-svc').value;})[0]||{price_incl_gst:0};
@@ -960,6 +1067,7 @@ function render(){
   var ne=$('msgs');if(ne)ne.scrollTop=atEnd?ne.scrollHeight:keep;
   if(S.modal&&S.focusModal){var mm=$('modal');if(mm){var f=mm.querySelector('input[type=text],select:not([disabled]),button');(f||mm).focus();}S.focusModal=false;}
   else if(focusId&&S.modal){var fe=$(focusId);if(fe&&fe.focus)fe.focus();}
+  if(S.modal&&S.modal.type==='job'&&S.focusSheet){var jsp=$('jobsheet');if(jsp)jsp.scrollIntoView();S.focusSheet=false;}
   if(S.modal&&S.modal.type==='booking')updateSummary();
 }
 function pushWidget(size){
@@ -1000,7 +1108,7 @@ document.addEventListener('click',async function(ev){
       var nz=function(t){return String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'');};
       var sv=(S.ref.services||[]).filter(function(x){return nz(x.name)===nz(pl.service);})[0];
       var lc=(S.ref.locations||[]).filter(function(x){return nz(pl.location).indexOf(nz(x.name))>=0;})[0];
-      openModal({type:'booking',pre:{name:pl.customer_name||'',phone:pl.whatsapp||'',service_id:sv?sv.id:undefined,loc:lc?lc.id:undefined,inboxId:row.id,wixId:row.wix_booking_id||''}});break;}
+      openModal({type:'booking',pre:{name:pl.customer_name||'',phone:pl.whatsapp||'',email:pl.email||'',address:pl.address||'',sess:pl.location||'',service_id:sv?sv.id:undefined,loc:lc?lc.id:undefined,inboxId:row.id,wixId:row.wix_booking_id||''}});break;}
     case 'inbox-dismiss':{
       var rd=await sb.from('booking_inbox').update({status:'handled'}).eq('id',Number(id));
       if(rd.error)throw rd.error;await refreshAfter('Dismissed.');break;}
@@ -1009,10 +1117,25 @@ document.addEventListener('click',async function(ev){
       if(!(v>=0)){toast('Enter a valid amount.',true);return;}
       var ra=await sb.from('orders').update({advance_paid:v}).eq('id',jb.order_id);
       if(ra.error)throw ra.error;await refreshAfter('Advance saved.');break;}
+    case 'save-travel':{
+      var jtv=jobById(id),tvr=$('trv').value.trim(),tv=tvr===''?0:parseFloat(tvr);
+      if(!(tv>=0)||tv>1000000){toast('Enter a valid amount.',true);return;}
+      var rtv=await sb.from('orders').update({travel_charges:tv}).eq('id',jtv.order_id);
+      if(rtv.error){
+        if(/travel_charges/.test(rtv.error.message||'')){toast('Run 10_travel_charges.sql in Supabase first, then try again.',true);return;}
+        throw rtv.error;
+      }
+      await refreshAfter('Travel charges saved.');break;}
     case 'new-enq':openModal({type:'enq'});break;
     case 'cancel-booking':openModal({type:'cancel',id:id});break;
     case 'open-remind':openModal({type:'remind',id:id});break;
     case 'open-update':openModal({type:'update',id:id});break;
+    case 'save-contact':{
+      var jc=jobById(id),cem=$('ct-email').value.trim(),cad=$('ct-addr').value.trim();
+      if(cem&&!/^\S+@\S+\.\S+$/.test(cem)){toast('That email address does not look right.',true);return;}
+      var rc=await sb.from('customers').update({email:cem?cem.toLowerCase():null,address:cad||null}).eq('id',jc.customerId);
+      if(rc.error)throw rc.error;
+      await refreshAfter('Contact details saved.');break;}
     case 'back-job':openModal({type:'job',id:id});break;
     case 'send-update':{
       var ju=jobById(id),utxt=$('up-text').value.trim(),ukey=$('up-key').value;
@@ -1076,10 +1199,16 @@ document.addEventListener('click',async function(ev){
       var addons=[];document.querySelectorAll('.b-ad').forEach(function(c){if(c.checked)addons.push(Number(c.value));});
       var bt=bookingTotals();
       var when=new Date($('b-date').value+'T'+$('b-time').value+':00+05:30').toISOString();
-      var rr=await sb.rpc('create_booking',{p_name:name,p_whatsapp:$('b-phone').value,p_opt_in:true,p_service_id:Number($('b-svc').value),p_frame_size_id:Number($('b-frame').value),p_addon_ids:addons,p_location_id:Number($('b-loc').value),p_session_at:when,p_advance:bt.adv,p_enquiry_id:el.getAttribute('data-enq')||null,p_wix_booking_id:el.getAttribute('data-wix')||null});
+      var bem=$('b-email').value.trim(),bad=$('b-addr').value.trim(),bse=el.getAttribute('data-sess')||'';
+      if(bem&&!/^\S+@\S+\.\S+$/.test(bem)){toast('That email address does not look right.',true);return;}
+      var bargs={p_name:name,p_whatsapp:$('b-phone').value,p_opt_in:true,p_service_id:Number($('b-svc').value),p_frame_size_id:Number($('b-frame').value),p_addon_ids:addons,p_location_id:Number($('b-loc').value),p_session_at:when,p_advance:bt.adv,p_enquiry_id:el.getAttribute('data-enq')||null,p_wix_booking_id:el.getAttribute('data-wix')||null};
+      if(bem)bargs.p_email=bem;if(bad)bargs.p_address=bad;if(bse)bargs.p_session_address=bse;
+      var rr=await sb.rpc('create_booking',bargs);
+      if(rr.error&&/p_email|p_address|p_session_address/.test(rr.error.message||'')){toast('Run 08_customer_contact.sql in Supabase first, or leave email and address blank.',true);return;}
       if(rr.error)throw rr.error;
       var ibx=el.getAttribute('data-inbox');if(ibx){await sb.from('booking_inbox').update({status:'handled'}).eq('id',Number(ibx));}
-      S.modal=null;S.view='jobs';await refreshAfter('Booking created. The job is assigned automatically.');break;}
+      S.modal=null;S.view='jobs';await refreshAfter('Booking created. Fill in the job sheet below.');
+      if(rr.data){S.focusSheet=true;openModal({type:'job',id:rr.data});}break;}
   }
   }catch(e){fail(e);}
 });
@@ -1093,6 +1222,15 @@ document.addEventListener('change',async function(ev){
   if(el){
     var k=el.getAttribute('data-change'),id=el.getAttribute('data-id');
     if(k==='loc'){S.locFilter=el.value;render();}
+    else if(k==='sh-field'){
+      var js=jobById(id),sk=el.getAttribute('data-key'),patch={};
+      patch[sk]=(el.type==='checkbox')?el.checked:el.value.trim();
+      if(sk==='delivery'){
+        var opt=SHEET_DELIVERY.filter(function(o){return o[0]===patch[sk];})[0];
+        if(opt&&opt[2]!=null){patch.delivery_date=addISO(js.casting_date,opt[2]+(js.wait_days||0));var de=$('sh-delivery_date');if(de)de.value=patch.delivery_date;}
+      }
+      await saveSheet(js,patch);
+    }
     else if(k==='qc-check'){
       var jq=jobById(id),qk=el.getAttribute('data-key'),cq=Object.assign({},jq.qc_checks||{});
       cq[qk]=Object.assign({},cq[qk]||{},{ok:el.checked});
